@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 6626b9f8</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 137687be</span>
   </div>
 </div>
 
@@ -1887,6 +1887,7 @@ function answerAsk(mode){
 function fitLayout(){
   var card=document.querySelector('.qcard'); if(!card) return;
   card.style.gridTemplateColumns=''; card.style.width='';   // 測る前に前回の指定を消す
+  card.classList.remove('wideq');
   var colA=card.querySelector('.col-a'); if(colA) colA.style.paddingTop='';
   var st0=document.getElementById('stage'); if(st0) st0.style.paddingTop='';
   if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches){
@@ -1999,6 +2000,15 @@ function fitLayout(){
   right=Math.min(right, Math.max(320, avail-need-GAP-PAD));
   card.style.gridTemplateColumns='minmax(0,'+need+'px) minmax(0,'+right+'px)';
   card.style.width=Math.min(avail, need+GAP+right+PAD)+'px';   // margin:auto で中央へ
+  // ★左の列が細いと、問題文が1行 数文字ずつで折り返して右が大きく空く（2026-09-24 指摘）。
+  //   「左列に入る全角の文字数」＝ 列の幅 ÷ 1文字の幅 が MIN_CHARS 未満のときだけ、
+  //   見出し行と問題文をカード幅いっぱいに伸ばす（.wideq）。コードと選択肢の列はそのまま。
+  var MIN_CHARS=28;
+  var pr2=card.querySelector('.prompt');
+  if(pr2){
+    var fs=parseFloat(getComputedStyle(pr2).fontSize)||17;
+    if(fs>0 && need/fs < MIN_CHARS) card.classList.add('wideq');
+  }
   // ★選択肢Aの上端を、左のコード欄の上端に合わせる。
   //   左の列は「見出し＋設問文」が上に乗るぶんコード欄が下がるので、その差を右に足す。
   //   ここは幅を確定させた後でないと、設問文の折り返し行数が変わって値がずれる。
@@ -2315,6 +2325,17 @@ renderQuestion();
     .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
       column-gap:24px;align-items:start;padding:14px 18px;margin-left:auto;margin-right:auto}
     .col-q,.col-a{display:block;min-width:0}
+    /* ★左の列が細くて問題文が1行あたり数文字しか入らない時だけ、見出し行と
+       問題文をカード幅いっぱいに伸ばす（2026-09-24 指摘）。判定は fitLayout()。
+       コードが細い問題だと問題文まで左の狭い列に押し込まれ、3行に折り返して
+       右側が大きく空いていた。.col-q を display:contents にして
+       その子（eyebrow / prompt / figbox）を直接グリッドに載せる。
+       ★display:block より後ろ かつ セレクタが詳しいので、こちらが勝つ */
+    .qcard.wideq:not(.onecol) .col-q{display:contents}
+    .qcard.wideq:not(.onecol) .col-q > *{grid-column:1}
+    .qcard.wideq:not(.onecol) .col-q > .eyebrow,
+    .qcard.wideq:not(.onecol) .col-q > .prompt{grid-column:1 / -1}
+    .qcard.wideq:not(.onecol) .col-a{grid-column:2}
     /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
        行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
     .qcard.onecol{display:block;max-width:1100px;margin-left:auto;margin-right:auto}
