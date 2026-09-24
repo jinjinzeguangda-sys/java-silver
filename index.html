@@ -19,6 +19,7 @@
     body{-webkit-touch-callout:none}
     input,textarea{-webkit-user-select:text}
   }
+
 </style>
 <!-- viewport: pwa側で指定 --><title>Java Silver 演習コンソール</title>
 <!-- jinji-pwa-package -->
@@ -109,45 +110,7 @@
      2026-09-24 追加。iPhone/iPad は pointer:coarse なのでこのブロックに当たらず、
      縦横どちらも今までどおり。既定では col-q/col-a は display:contents で無い物と同じ。*/
   .col-q,.col-a{display:contents}
-  @media (min-width:1080px) and (pointer:fine) and (hover:hover){
-    /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
-    .wrap{max-width:1600px;padding:4px 18px 10px}
-    /* 問題画面は1画面に収める（上下スクロールを出さない）。
-       :has が無いブラウザでは従来どおり縦に伸びるだけで壊れない */
-    /* 問題画面のときだけ、ページ自体のスクロールを止める。
-       成績画面・問題選択画面（.qcard が無い）では従来どおり縦に伸びて普通にスクロールする。
-       カード内部は overflow:auto なので、収まらない内容も必ず読める */
-    html:has(.qcard),body:has(.qcard){height:100%;overflow:hidden}
-    .wrap:has(.qcard){height:100vh;overflow:hidden;display:flex;flex-direction:column}
-    /* ★カードは .wrap の直下ではなく #stage の中。高さの制約を stage 経由で
-       カードまで届かせないと、カードは伸び放題になり fitLayout が常に
-       「収まっている」と誤判定し、あふれた「次の問題」ボタンが切り落とされる */
-    .wrap:has(.qcard) #stage{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
-    .wrap:has(.qcard) #stage>.qcard{flex:0 1 auto;min-height:0}
-    .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
-      column-gap:28px;align-items:stretch;padding:16px 22px;overflow:hidden}
-    .col-q,.col-a{display:block;min-width:0;min-height:0;overflow:auto}
-    /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
-       行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
-    .qcard.onecol{display:block;overflow:auto;
-      max-width:900px;margin-left:auto;margin-right:auto}
-    .qcard.onecol .col-q,.qcard.onecol .col-a{display:contents}
-    .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
-    .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
-    /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
-    .figbox{line-height:1.62;padding:12px 0;font-size:15px}
-    .figline{padding:1px 15px}
-    .opts{gap:12px}
-    .opt{padding:15px 16px;line-height:1.65}
-    .exp{line-height:1.85}
-    .askbox{margin-top:20px}
-    /* ヘッダを1行にして縦を半分にする（題名とゲージを並べる）*/
-    .topbar{display:flex;align-items:center;gap:22px;padding:3px 0 3px;margin-bottom:8px;flex:0 0 auto}
-    .brand{flex:0 0 auto}
-    .brand h1{font-size:14.5px}
-    .meta{flex:1 1 auto;margin-top:0}
-    .footer{margin-top:8px;flex:0 0 auto}
-  }
+
 
   .cat{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;
     color:var(--accent);font-weight:650}
@@ -1920,10 +1883,31 @@ function answerAsk(mode){
 // Macだけの挙動。iPhone/iPad は元々1カラムなので何もしない。
 function fitLayout(){
   var card=document.querySelector('.qcard'); if(!card) return;
+  card.style.gridTemplateColumns=''; card.style.width='';   // 測る前に前回の指定を消す
   if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches){
     card.classList.remove('onecol'); return; }
-  card.classList.add('onecol');                       // まず1カラムで測る
-  if(card.scrollHeight > card.clientHeight + 2) card.classList.remove('onecol');
+  // ★コードが無い問題は、収まらなくても左右に割らない（左半分が丸ごと空になるため）
+  var box=card.querySelector('.col-q .figbox');
+  if(!box){ card.classList.add('onecol'); return; }
+  card.classList.add('onecol');                       // まず1列で測る
+  if(document.documentElement.scrollHeight <= innerHeight + 2) return;  // 1列で1画面に収まった
+  card.classList.remove('onecol');
+  // 2列にするときは、左の列をコードの実幅ぶんにし、
+  // 余った幅は右へ回さずカードごと縮めて中央へ寄せる。
+  // 上限/下限を付けないと、1行だけ極端に長いコードで右が潰れる
+  var w=0;
+  box.querySelectorAll('.fcode').forEach(function(e){
+    var r=e.getBoundingClientRect(); if(r.width>w) w=r.width; });
+  var no=box.querySelector('.fno');
+  var lead=no?no.getBoundingClientRect().width:24;
+  var avail=card.clientWidth;
+  var GAP=24, PAD=28;                                  // column-gap と カード左右padding(14*2)
+  var need=Math.ceil(w+lead+46);
+  need=Math.max(Math.round(avail*0.30), Math.min(need, Math.round(avail*0.66)));
+  // 右（選択肢）は読みやすい幅で固定する。伸ばすと左に余白が寄って偏る
+  var right=Math.min(660, Math.max(380, avail-need-GAP-PAD));
+  card.style.gridTemplateColumns='minmax(0,'+need+'px) minmax(0,'+right+'px)';
+  card.style.width=Math.min(avail, need+GAP+right+PAD)+'px';   // margin:auto で中央へ
 }
 addEventListener('resize', fitLayout);
 
@@ -2190,6 +2174,39 @@ renderQuestion();
     .cbthome{right:10px;bottom:10px;padding:10px 14px}
     .cbtgrid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
     .cbtscreen{padding:10px}
+  }
+  /* ===== ここから下は Mac（広い画面＋マウス）だけ。
+     ★必ず基本ルールより後ろに置くこと。前に置くと同じ強さの指定が後勝ちで潰れる
+       （2026-09-24に実際に7件が死んでいて「変わってない」と2回言われた）===== */
+  @media (min-width:1080px) and (pointer:fine) and (hover:hover){
+    /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
+    .wrap{max-width:1900px;padding:4px 8px 10px}
+    /* 問題画面は1画面に収める（上下スクロールを出さない）。
+       :has が無いブラウザでは従来どおり縦に伸びるだけで壊れない */
+    /* ★スクロールはページ全体で1本だけ。列ごとに出さない
+       （1画面に収まる問題ではそもそもスクロールバーが出ない） */
+    .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
+      column-gap:24px;align-items:start;padding:14px 14px;margin-left:auto;margin-right:auto}
+    .col-q,.col-a{display:block;min-width:0}
+    /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
+       行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
+    .qcard.onecol{display:block;max-width:1100px;margin-left:auto;margin-right:auto}
+    .qcard.onecol .col-q,.qcard.onecol .col-a{display:contents}
+    .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
+    .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
+    /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
+    .figbox{line-height:1.8;padding:12px 0}
+    .figline{padding:3px 12px}
+    .opts{gap:12px}
+    .opt{padding:15px 16px;line-height:1.65}
+    .exp{line-height:1.85}
+    .askbox{margin-top:20px}
+    /* ヘッダを1行にして縦を半分にする（題名とゲージを並べる）*/
+    .topbar{display:flex;align-items:center;gap:22px;padding:3px 0 3px;margin-bottom:8px;flex:0 0 auto}
+    .brand{flex:0 0 auto}
+    .brand h1{font-size:14.5px}
+    .meta{flex:1 1 auto;margin-top:0}
+    .footer{margin-top:8px;flex:0 0 auto}
   }
 </style>
 <script>
