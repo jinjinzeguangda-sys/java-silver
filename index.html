@@ -104,6 +104,20 @@
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
     box-shadow:var(--shadow);padding:22px 20px}
   .eyebrow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+
+  /* ===== 横長レイアウト（Macのみ）=====
+     2026-09-24 追加。iPhone/iPad は pointer:coarse なのでこのブロックに当たらず、
+     縦横どちらも今までどおり。既定では col-q/col-a は display:contents で無い物と同じ。*/
+  .col-q,.col-a{display:contents}
+  @media (min-width:1080px) and (pointer:fine) and (hover:hover){
+    .wrap{max-width:1200px}
+    .qcard{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);
+      column-gap:26px;align-items:start;padding:24px 24px}
+    .col-q,.col-a{display:block;min-width:0}
+    .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
+    .prompt{font-size:16.5px}
+  }
+
   .cat{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;
     color:var(--accent);font-weight:650}
   .src{font-size:11px;color:var(--faint)}
@@ -1876,13 +1890,16 @@ function renderQuestion(){
   pbar.style.width=(pos/queue.length*100)+'%';
   scoreEl.innerHTML='<b>'+sessCorrect+'</b> / '+sessDone+' 正解';
   stage.innerHTML=`
-    <div class="card reveal">
+    <div class="card reveal qcard">
+      <div class="col-q">
       <div class="eyebrow">
         <span class="cat">${esc(q.cat)}</span>
         <span class="qnum">${pos+1} / ${queue.length}</span>
       </div>
       <div class="prompt">${esc(q.prompt)} ${q.multi?'<span class="multi-tag">複数選択</span>':''}</div>
       ${codeBlockHtml(q)}
+      </div>
+      <div class="col-a">
       <div class="opts" id="opts"></div>
       <div id="after"></div>
       <div class="askbox">
@@ -1890,6 +1907,7 @@ function renderQuestion(){
         <textarea class="ask-q" id="askq" rows="2" placeholder="例：3行目は何をしている？／なぜこの結果になる？"></textarea>
         <div class="ask-row"><button class="ask-btn" type="button" onclick="answerAsk('free')">質問する</button><button class="ask-chip" type="button" onclick="answerAsk('flow')">コードの流れ</button><button class="ask-chip" type="button" onclick="answerAsk('answer')">正解と解説</button><span class="ask-hint" id="askhint"></span></div>
         <div class="ask-a" id="aska"></div>
+      </div>
       </div>
     </div>`;
   const opts=document.getElementById('opts');
