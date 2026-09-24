@@ -119,6 +119,12 @@
     .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
       column-gap:28px;align-items:stretch;padding:16px 22px;overflow:hidden}
     .col-q,.col-a{display:block;min-width:0;min-height:0;overflow:auto}
+    /* コードが無い問題は左右に割らない（左半分が丸ごと空になるため）。
+       判定は「左の列に図がある問題か」。回答後に右へ挿さる図には反応させない */
+    .qcard:not(:has(.col-q .figbox)){display:block;overflow:auto;
+      max-width:900px;margin-left:auto;margin-right:auto}
+    .qcard:not(:has(.col-q .figbox)) .col-q,
+    .qcard:not(:has(.col-q .figbox)) .col-a{display:contents}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
