@@ -110,12 +110,19 @@
      縦横どちらも今までどおり。既定では col-q/col-a は display:contents で無い物と同じ。*/
   .col-q,.col-a{display:contents}
   @media (min-width:1080px) and (pointer:fine) and (hover:hover){
-    .wrap{max-width:1200px}
+    /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
+    .wrap{max-width:1600px;padding:8px 10px 36px}
     .qcard{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);
-      column-gap:26px;align-items:start;padding:24px 24px}
+      column-gap:22px;align-items:start;padding:16px 16px}
     .col-q,.col-a{display:block;min-width:0}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:16.5px}
+    /* ヘッダを1行にして縦を半分にする（題名とゲージを並べる）*/
+    .topbar{display:flex;align-items:center;gap:22px;padding:7px 0 7px;margin-bottom:12px}
+    .brand{flex:0 0 auto}
+    .brand h1{font-size:14.5px}
+    .meta{flex:1 1 auto;margin-top:0}
+    .footer{margin-top:16px}
   }
 
   .cat{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;
