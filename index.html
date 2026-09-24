@@ -23,6 +23,15 @@
 <!-- viewport: pwa側で指定 --><title>Java Silver 演習コンソール</title>
 <!-- jinji-pwa-package -->
 <link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style id="jinji-pwa-package-safe">
+  /* ホーム画面から起動した時だけ、時計・ノッチのぶん上に余白を作る。
+     （black-translucent は内容をステータスバーの下まで広げるため）
+     ブラウザで普通に開いた時は何も変えない。 */
+  @media (display-mode:standalone){
+    body{ padding-top: max(0px, env(safe-area-inset-top)); }
+  }
+</style>
 <meta name="theme-color" content="#1b3a5e">
 <script id="jinji-pwa-package-sw">
 // Service Worker の登録。file:// や非対応環境では黙って何もしない（見た目に影響させない）
