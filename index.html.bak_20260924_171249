@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 9a6ab15c</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 137687be</span>
   </div>
 </div>
 
@@ -2064,10 +2064,6 @@ function fitLayout(force){
       colA.style.paddingTop=cur+'px';
     }
   }
-  // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
-  //   カードの中の位置関係は動かないので、揃えは壊れない。
-  //   2026-09-24 実測: 2056x1329 で Q19/28/33/48/77 が上下 25〜63px ずれていた
-  centerVertically();
 }
 
 // 1画面に収まる問題は、上に貼り付かず縦の中央へ。

@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 9a6ab15c</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 137687be</span>
   </div>
 </div>
 
@@ -1884,15 +1884,8 @@ function answerAsk(mode){
 // 1カラムで1画面に収まるならそのまま、はみ出す時だけ左右2カラムに割る。
 // 行数の閾値では決めない（コードが短くても選択肢が長ければ収まらないため）。
 // Macだけの挙動。iPhone/iPad は元々1カラムなので何もしない。
-// ★force=true のときだけ測り直す。回答した後に測り直すと、解説のぶん
-//   高さが変わって中央寄せや onecol の判定がやり直され、コードと選択肢の
-//   位置関係が回答の前後で変わってしまう（2026-09-24 本人指示
-//   「基本的に回答前と後ではレイアウトは変わらないようにしてほしい」）。
-//   カードは問題ごとに作り直されるので、この印も毎問リセットされる。
-function fitLayout(force){
+function fitLayout(){
   var card=document.querySelector('.qcard'); if(!card) return;
-  if(!force && card.dataset.laid==='1') return;
-  card.dataset.laid='1';
   card.style.gridTemplateColumns=''; card.style.width=''; card.style.maxWidth='';  // 測る前に前回の指定を消す
   card.classList.remove('wideq');
   var pr0=card.querySelector('.prompt'); if(pr0) pr0.style.maxWidth='';
@@ -2064,10 +2057,6 @@ function fitLayout(force){
       colA.style.paddingTop=cur+'px';
     }
   }
-  // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
-  //   カードの中の位置関係は動かないので、揃えは壊れない。
-  //   2026-09-24 実測: 2056x1329 で Q19/28/33/48/77 が上下 25〜63px ずれていた
-  centerVertically();
 }
 
 // 1画面に収まる問題は、上に貼り付かず縦の中央へ。
@@ -2080,7 +2069,7 @@ function centerVertically(){
   var free=Math.round(innerHeight - wp.getBoundingClientRect().height);
   if(free>8) st.style.paddingTop=Math.round(free/2)+'px';
 }
-addEventListener('resize', function(){ fitLayout(true); });   // 画面幅が変わった時だけ測り直す
+addEventListener('resize', fitLayout);
 
 function renderQuestion(){
   answered=false; selected=new Set();
@@ -2606,7 +2595,7 @@ renderQuestion();
     //   その行の高さが 19.2px → 26.0px（+6.8px）に変わる。_render の中の
     //   fitLayout() はそれより前に走っているため、揃えが毎問ぴったり 7px ずれていた
     //   （2026-09-24 実測 0/66）。足し終わってから測り直す。
-    if(typeof fitLayout==='function') fitLayout(true); };
+    if(typeof fitLayout==='function') fitLayout(); };
 
   if(typeof choose==='function'){
     var _choose=choose;

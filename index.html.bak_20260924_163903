@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 9a6ab15c</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 137687be</span>
   </div>
 </div>
 
@@ -1884,18 +1884,10 @@ function answerAsk(mode){
 // 1カラムで1画面に収まるならそのまま、はみ出す時だけ左右2カラムに割る。
 // 行数の閾値では決めない（コードが短くても選択肢が長ければ収まらないため）。
 // Macだけの挙動。iPhone/iPad は元々1カラムなので何もしない。
-// ★force=true のときだけ測り直す。回答した後に測り直すと、解説のぶん
-//   高さが変わって中央寄せや onecol の判定がやり直され、コードと選択肢の
-//   位置関係が回答の前後で変わってしまう（2026-09-24 本人指示
-//   「基本的に回答前と後ではレイアウトは変わらないようにしてほしい」）。
-//   カードは問題ごとに作り直されるので、この印も毎問リセットされる。
-function fitLayout(force){
+function fitLayout(){
   var card=document.querySelector('.qcard'); if(!card) return;
-  if(!force && card.dataset.laid==='1') return;
-  card.dataset.laid='1';
-  card.style.gridTemplateColumns=''; card.style.width=''; card.style.maxWidth='';  // 測る前に前回の指定を消す
+  card.style.gridTemplateColumns=''; card.style.width='';   // 測る前に前回の指定を消す
   card.classList.remove('wideq');
-  var pr0=card.querySelector('.prompt'); if(pr0) pr0.style.maxWidth='';
   var colA=card.querySelector('.col-a'); if(colA) colA.style.paddingTop='';
   var st0=document.getElementById('stage'); if(st0) st0.style.paddingTop='';
   if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches){
@@ -1912,26 +1904,16 @@ function fitLayout(force){
       //   一番幅の広い選択肢が列幅に収まる（＝2列にしても折り返しが増えない）ときだけ2列。
       //   ★.opt には width:100% が効いているので、親だけ max-content にしても
       //     「100%＝グリッド領域の幅」が返る。子を1つずつ max-content にして測る。
-      var two = n>=4, natMax=0;
-      if(opts.children.length){
+      var two = n>=4;
+      if(two){
         opts.classList.remove('two');
         [].forEach.call(opts.children,function(e){ e.style.gridColumn=''; e.style.gridRow=''; });
         var full=opts.getBoundingClientRect().width;
-        var kids0=[].slice.call(opts.children), kw0=[];
+        var kids0=[].slice.call(opts.children), kw0=[], natMax=0;
         kids0.forEach(function(e){ kw0.push(e.style.width); e.style.width='max-content'; });
         kids0.forEach(function(e){ var w=e.getBoundingClientRect().width; if(w>natMax) natMax=w; });
         kids0.forEach(function(e,i){ e.style.width=kw0[i]; });
-        if(two) two = natMax <= (full-12)/2 + 1;   // gap 12 を引いた列幅に収まるか
-      }
-      // ★カードを左右いっぱいに伸ばさない（2026-09-24 指摘 #56
-      //   「左右目一杯じゃなくて適度に余白減らしてほしい」）。
-      //   一番広い選択肢の実幅から必要なぶんだけ取り、CSSの上限 1280 の内側に収める。
-      //   下限 820 は、問題文が左列で2行に収まる程度の幅を確保するため
-      //   （これより狭いと選択肢Cを問題文の横に置けなくなる。#57）
-      if(natMax>0){
-        var PADX=36;                                   // .qcard の左右 padding 18*2
-        var wantW=(two ? natMax*2+12 : natMax)+PADX;
-        card.style.maxWidth=Math.max(820, Math.min(1280, Math.ceil(wantW)))+'px';
+        two = natMax <= (full-12)/2 + 1;      // gap 12 を引いた列幅に収まるか
       }
       opts.classList.toggle('two', two);
       opts.style.marginTop='';
@@ -1951,40 +1933,19 @@ function fitLayout(force){
         // ★選択肢が偶数のときは持ち上げない＝AとCを隣に並べる（2026-09-24 指摘）。
         //   持ち上げるのは「奇数」か「持ち上げないと1画面に収まらない」ときだけ。
         //   （奇数だと右列が1つ多くなるので、持ち上げた方が左右の段数が揃う）
-        // ★持ち上げるのは奇数のときだけ。偶数は「AとCを隣」が本人指示（2026-09-24 #21）。
-        //   以前あった「1画面に収まらないなら持ち上げる」の逃げ道は廃止した。
-        //   #58（n=4）で偶数なのに持ち上がり、しかも縦はむしろ伸びていた
-        var wantLift = (n % 2 === 1);
+        var wantLift = (n % 2 === 1)
+                    || (document.documentElement.scrollHeight > innerHeight + 2);
         // 右列を問題文の高さぶん持ち上げ、選択肢Cが問題文の右に並ぶようにする。
         // ★問題文が右列の領域まで伸びている問題では重なるので持ち上げない。
         var pr=wantLift ? card.querySelector('.prompt') : null;
         if(pr){
-          var ob0=opts.getBoundingClientRect();
-          var colW=(ob0.width-12)/2;                        // 片列の幅
-          var colR=ob0.left + colW + 12;                    // 右列の左端（gap 12）
-          var maxR=function(){
-            var rg=document.createRange(); rg.selectNodeContents(pr);
-            var m=0; [].forEach.call(rg.getClientRects(),function(q){ if(q.right>m) m=q.right; });
-            return m; };
-          // ★問題文が右列まで伸びているなら、左列の幅で折り返させる
-          //   （2026-09-24 指摘 #57「問題文を折り返して左側に収めて、cの選択肢を上にずらして」）。
-          //   本人の許可は「2行まで」。3行以上になるなら折り返しをやめ、持ち上げもしない
-          //   （本人 2026-09-24「問題文が入らないなら2行に折り返すとかして」）
-          if(maxR()+16>colR){
-            var lh=parseFloat(getComputedStyle(pr).lineHeight)||28;
-            pr.style.maxWidth=Math.floor(colW-16)+'px';
-            if(pr.getBoundingClientRect().height > lh*2.4) pr.style.maxWidth='';
-          }
           var pb=pr.getBoundingClientRect(), ob=opts.getBoundingClientRect();
           var dy=Math.round(ob.top-pb.top);
-          // ★問題文の横に来る選択肢（＝C）の方がずっと背が高いと、
-          //   持ち上げた結果 問題文の下に大きな空白ができる（2026-09-24 指摘 #58/#59）。
-          //   背の差が 40px を超えるなら持ち上げない。
-          //   実測: #56 は差 33px（本人「いい感じ」）／#59 は 101px／#58 は 191px
-          var rc=opts.children[Math.floor(n/2)];        // 右列の1つ目（＝C）
-          var gapH=rc ? Math.round(rc.getBoundingClientRect().height - pb.height) : 0;
-          if(dy>0 && maxR()+16<=colR && gapH<=40){ place(true); opts.style.marginTop=(-dy)+'px'; }
-          else pr.style.maxWidth='';
+          var rgx=document.createRange(); rgx.selectNodeContents(pr);
+          var mr=0;
+          [].forEach.call(rgx.getClientRects(),function(q){ if(q.right>mr) mr=q.right; });
+          var colR=ob.left + (ob.width-12)/2 + 12;          // 右列の左端（gap 12）
+          if(dy>0 && mr+16<=colR){ place(true); opts.style.marginTop=(-dy)+'px'; }
         }
       }
     }
@@ -2064,10 +2025,6 @@ function fitLayout(force){
       colA.style.paddingTop=cur+'px';
     }
   }
-  // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
-  //   カードの中の位置関係は動かないので、揃えは壊れない。
-  //   2026-09-24 実測: 2056x1329 で Q19/28/33/48/77 が上下 25〜63px ずれていた
-  centerVertically();
 }
 
 // 1画面に収まる問題は、上に貼り付かず縦の中央へ。
@@ -2080,7 +2037,7 @@ function centerVertically(){
   var free=Math.round(innerHeight - wp.getBoundingClientRect().height);
   if(free>8) st.style.paddingTop=Math.round(free/2)+'px';
 }
-addEventListener('resize', function(){ fitLayout(true); });   // 画面幅が変わった時だけ測り直す
+addEventListener('resize', fitLayout);
 
 function renderQuestion(){
   answered=false; selected=new Set();
@@ -2376,13 +2333,9 @@ renderQuestion();
        ★display:block より後ろ かつ セレクタが詳しいので、こちらが勝つ */
     .qcard.wideq:not(.onecol) .col-q{display:contents}
     .qcard.wideq:not(.onecol) .col-q > *{grid-column:1}
-    /* ★行を明示する。自動配置に任せると、回答時に revealFigure() が .col-q へ
-       図解を1個 足した瞬間に .col-a が1行ぶん下へ落ちる
-       （2026-09-24 実測: Q4 で選択肢Aがコードより 407px 下がった）。
-       display:contents なので、後から増えた子もグリッド項目になるのが原因 */
-    .qcard.wideq:not(.onecol) .col-q > .eyebrow{grid-column:1 / -1;grid-row:1}
-    .qcard.wideq:not(.onecol) .col-q > .prompt{grid-column:1 / -1;grid-row:2}
-    .qcard.wideq:not(.onecol) .col-a{grid-column:2;grid-row:3 / span 99}
+    .qcard.wideq:not(.onecol) .col-q > .eyebrow,
+    .qcard.wideq:not(.onecol) .col-q > .prompt{grid-column:1 / -1}
+    .qcard.wideq:not(.onecol) .col-a{grid-column:2}
     /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
        行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
     .qcard.onecol{display:block;max-width:1100px;margin-left:auto;margin-right:auto}
@@ -2393,10 +2346,7 @@ renderQuestion();
     /* ★行方向(A B / C D / E)ではなく列方向(左A B / 右C D E)に流す。
        1列目の段数は選択肢の数から fitLayout() が決める（CSSでは割り算できない） */
     .qcard.onecol.nofig .opts.two{display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start;
-      /* ★行の高さに引き伸ばさない。伸ばすと、右に6行のコード選択肢がある時
-         左の短い選択肢が同じ高さの空箱になる（2026-09-24 指摘 #57）*/
-      align-items:start}
+      grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
@@ -2606,7 +2556,7 @@ renderQuestion();
     //   その行の高さが 19.2px → 26.0px（+6.8px）に変わる。_render の中の
     //   fitLayout() はそれより前に走っているため、揃えが毎問ぴったり 7px ずれていた
     //   （2026-09-24 実測 0/66）。足し終わってから測り直す。
-    if(typeof fitLayout==='function') fitLayout(true); };
+    if(typeof fitLayout==='function') fitLayout(); };
 
   if(typeof choose==='function'){
     var _choose=choose;
