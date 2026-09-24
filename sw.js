@@ -1,6 +1,14 @@
 // 目的: 初回に読んだものをキャッシュし、以降オフラインでも開けるようにする。
-// 方針: cache-first（教材は変わらないので速さ優先）。版を上げたら CACHE を変える。
-const CACHE = 'javasilver-59b1b656';
+// 方針（2026-09-24 に2点 直した）:
+//   ① ページ本体（ナビゲーション / index.html）は network-first。
+//      cache-first だと直しても古い画面が出続ける。実際この日、直した版を出した後も
+//      端末側が旧版を表示し続け、「反映されていない」と3回 指摘された。
+//      オフライン時だけキャッシュに落ちる。
+//   ② activate の掃除は必ず自分の接頭辞だけ。
+//      ★Cache Storage は「オリジン単位」で、同じドメインに入口＋37本が同居している。
+//      k !== CACHE で消すと、更新のたびに他の36本のキャッシュを全部 巻き添えで消す。
+const CACHE  = 'javasilver-81caf586';
+const PREFIX = 'javasilver-';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -8,16 +16,32 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
-                 .then(() => self.clients.claim())
+    caches.keys()
+      .then(ks => Promise.all(ks.filter(k => k.startsWith(PREFIX) && k !== CACHE)
+                                .map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
+  const url = new URL(e.request.url);
+  const isPage = e.request.mode === 'navigate' || url.pathname.endsWith('/index.html')
+                 || url.pathname.endsWith('/java-silver/');
+  if (isPage) {                       // 本体は「まず取りに行く」
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.ok && url.origin === location.origin) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(hit => hit || caches.match('./index.html')))
+    );
+    return;
+  }
+  e.respondWith(                      // それ以外は今までどおり速さ優先
     caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
-      // 同一オリジンの正常応答だけ貯める
-      if (res && res.ok && new URL(e.request.url).origin === location.origin) {
+      if (res && res.ok && url.origin === location.origin) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));
       }

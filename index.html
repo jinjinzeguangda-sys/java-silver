@@ -88,6 +88,8 @@
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
     -webkit-font-smoothing:antialiased;margin:0}
   .wrap{max-width:660px;margin:0 auto;padding:20px 18px 64px}
+  /* どの版を見ているか本人が言えるようにする印（キャッシュで古い画面が出た時の切り分け用） */
+  .build{opacity:.45;font-size:11px;letter-spacing:.04em}
   .topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);
     backdrop-filter:blur(8px);padding:14px 0 12px;margin-bottom:18px;border-bottom:1px solid var(--border)}
   .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -279,7 +281,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 81caf586</span>
   </div>
 </div>
 
@@ -1888,7 +1890,28 @@ function fitLayout(){
     card.classList.remove('onecol'); return; }
   // ★コードが無い問題は、収まらなくても左右に割らない（左半分が丸ごと空になるため）
   var box=card.querySelector('.col-q .figbox');
-  if(!box){ card.classList.add('onecol'); return; }
+  var opts=card.querySelector('.opts');
+  if(!box){
+    card.classList.add('onecol','nofig');
+    // 選択肢が4つ以上のときだけ2列。3つ以下は1:2に割れて不格好なので1列のまま
+    var n=opts?opts.children.length:0;
+    if(opts){
+      var two = n>=4;
+      opts.classList.toggle('two', two);
+      // ★1つずつ列と段を指定する。grid-auto-flow:column に段数を渡す書き方だと
+      //   5個が 2/2/1 の「3列」に溢れる（2026-09-24 実測）。左は floor(n/2) 個。
+      var k=Math.floor(n/2);
+      [].forEach.call(opts.children,function(e,i){
+        if(!two){ e.style.gridColumn=''; e.style.gridRow=''; return; }
+        e.style.gridColumn = (i<k) ? '1' : '2';
+        e.style.gridRow    = ((i<k ? i : i-k) + 1);
+      });
+    }
+    return;
+  }
+  card.classList.remove('nofig');
+  if(opts){ opts.classList.remove('two'); opts.style.gridTemplateRows='';
+    [].forEach.call(opts.children,function(e){e.style.gridColumn='';e.style.gridRow='';}); }
   card.classList.add('onecol');                       // まず1列で測る
   if(document.documentElement.scrollHeight <= innerHeight + 2) return;  // 1列で1画面に収まった
   card.classList.remove('onecol');
@@ -1903,9 +1926,19 @@ function fitLayout(){
   var avail=card.clientWidth;
   var GAP=24, PAD=28;                                  // column-gap と カード左右padding(14*2)
   var need=Math.ceil(w+lead+46);
-  need=Math.max(Math.round(avail*0.30), Math.min(need, Math.round(avail*0.66)));
-  // 右（選択肢）は読みやすい幅で固定する。伸ばすと左に余白が寄って偏る
-  var right=Math.min(660, Math.max(380, avail-need-GAP-PAD));
+  need=Math.max(320, Math.min(need, Math.round(avail*0.66)));
+  // ★右（選択肢）も"中身の実幅"で決める。固定幅にすると
+  //   「[a, b, c]」のような短い選択肢のとき右半分がまるごと空白になる（2026-09-24 指摘）。
+  //   max-content で折り返さない時の幅を測り、上下限で挟む
+  var right=420;
+  if(opts){
+    var keep=opts.style.width;
+    opts.style.width='max-content';
+    right=Math.ceil(opts.getBoundingClientRect().width);
+    opts.style.width=keep;
+    right=Math.min(660, Math.max(400, right+10));
+  }
+  right=Math.min(right, Math.max(320, avail-need-GAP-PAD));
   card.style.gridTemplateColumns='minmax(0,'+need+'px) minmax(0,'+right+'px)';
   card.style.width=Math.min(avail, need+GAP+right+PAD)+'px';   // margin:auto で中央へ
 }
@@ -2192,6 +2225,13 @@ renderQuestion();
        行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
     .qcard.onecol{display:block;max-width:1100px;margin-left:auto;margin-right:auto}
     .qcard.onecol .col-q,.qcard.onecol .col-a{display:contents}
+    /* コードが無い問題（nofig）は縦一列だと間延びするので、選択肢だけ2列に並べる。
+       設問文・質問欄・解説は全幅のまま（読む順が崩れるため） */
+    .qcard.onecol.nofig{max-width:1280px}
+    /* ★行方向(A B / C D / E)ではなく列方向(左A B / 右C D E)に流す。
+       1列目の段数は選択肢の数から fitLayout() が決める（CSSでは割り算できない） */
+    .qcard.onecol.nofig .opts.two{display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
