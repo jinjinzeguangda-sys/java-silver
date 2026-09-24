@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 66a3cc90</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 103f8ab9</span>
   </div>
 </div>
 
@@ -1934,7 +1934,13 @@ function reserveForReveal(box){
 function fitLayout(force){
   var card=document.querySelector('.qcard'); if(!card) return;
   if(!force && card.dataset.laid==='1') return;
-  card.dataset.laid='1';
+  // ★回答した後は測り直さない（2026-09-24 実測）。
+  //   回答すると注釈でコード欄が伸びるので、その状態で測ると別の結論が出て
+  //   「左へ回した選択肢の数」が回答の前後で変わる（実測 Q68 で 1個→2個）。
+  //   幅が変わった時だけはやり直す（画面の回転・ウインドウ操作）。
+  var answered = !!card.querySelector('.opt.correct, .opt.wrong');
+  if(answered && card.dataset.laidW === String(innerWidth)) return;
+  card.dataset.laid='1'; card.dataset.laidW=String(innerWidth);
   // ★左の列へ回した「選択肢・質問欄」を、測る前に元へ戻す（幅が変われば回す量も変わる）
   var oldF=card.querySelector('.leftfill');
   if(oldF){
@@ -2141,12 +2147,17 @@ function fitLayout(force){
   //   回す数は決め打ちしない（左の列が細いと折り返して逆に伸びるため）。
   if(colA && opts){
     var colQ=card.querySelector('.col-q');
-    var reserveMT=reserveForReveal(box);       // 回答時に入る注釈のぶんを先に空ける
+    // ★回答済みなら注釈はもう入っているので予約しない（二重に空けてしまう）
+    var reserveMT = answered ? 14 : reserveForReveal(box);
     var rightW=Math.round(opts.getBoundingClientRect().width);
     var fill=null;
-    var ensureFill=function(){
-      if(!fill){ fill=document.createElement('div'); fill.className='leftfill';
-        fill.style.marginTop=reserveMT.toFixed(3)+'px'; colQ.appendChild(fill); }
+    // ★予約枠(marginTop)を付けるのは「選択肢」を回すときだけ。
+    //   質問欄は"回答の選択肢"ではないので、回答時に注釈で下がってよい。
+    //   予約したままだとコードのすぐ下が大きく空く（2026-09-24 指摘 #69
+    //   「これもうちょっと質問欄上にできない？」）
+    var ensureFill=function(reserve){
+      if(!fill){ fill=document.createElement('div'); fill.className='leftfill'; colQ.appendChild(fill); }
+      fill.style.marginTop = reserve ? reserveMT.toFixed(3)+'px' : '';   // '' = CSS既定の 14px
       return fill; };
     var dropFill=function(){ if(fill && !fill.children.length){ fill.remove(); fill=null; } };
     var leftBot=function(){ var b=box.getBoundingClientRect().bottom;
@@ -2155,20 +2166,16 @@ function fitLayout(force){
     var cardH=function(){ return Math.max(leftBot(), colA.getBoundingClientRect().bottom)
                                  - card.getBoundingClientRect().top; };
     var h0=cardH();
-    // ① 質問欄
-    var ask=colA.querySelector(':scope > .askbox');
-    if(ask){
-      ensureFill().appendChild(ask);
-      if(cardH() >= h0-8){ colA.appendChild(ask); dropFill(); }
-      else h0=cardH();
-    }
-    // ② 選択肢（末尾から1つずつ。右に最低2つ残す）
+    // ★順番は「選択肢 → 質問欄」。逆にすると、予約の無い質問欄が先に空白を埋めてしまい、
+    //   選択肢を回しても高さが縮まなくなる（2026-09-24 実測: 選択肢の移動が12問→1問に激減）
+    // ① 選択肢（末尾から1つずつ。右に最低2つ残す）… 回答の前後で動いてはいけないので予約する
+    var oL=null;
     if(opts.children.length>=4){
-      var oL=null, best=h0, bestK=0, k=0;
+      var best=h0, bestK=0, k=0;
       while(opts.children.length>2){
         if(!oL){ oL=document.createElement('div'); oL.className='opts-left';
           oL.style.maxWidth=rightW+'px';
-          ensureFill(); fill.insertBefore(oL, fill.firstChild); }
+          ensureFill(true); fill.appendChild(oL); }
         oL.insertBefore(opts.lastElementChild, oL.firstChild);   // 末尾から・順序は保つ
         k++;
         var hk=cardH();
@@ -2177,7 +2184,14 @@ function fitLayout(force){
       if(h0-best < 8) bestK=0;   // ★40→8。実測(2026-09-24) Q4 は移せば20px縮むのに
                              //   40px の下限で却下され、186px の空白が残っていた
       while(oL && k>bestK){ opts.appendChild(oL.firstElementChild); k--; }
-      if(oL && bestK===0){ oL.remove(); dropFill(); }
+      if(oL && bestK===0){ oL.remove(); oL=null; if(fill) fill.style.marginTop=''; dropFill(); }
+      else h0=cardH();
+    }
+    // ② 質問欄 … 選択肢の後ろへ。選択肢を回していないなら予約せずコードのすぐ下（#69）
+    var ask=colA.querySelector(':scope > .askbox');
+    if(ask){
+      ensureFill(!!oL).appendChild(ask);
+      if(cardH() >= h0-8){ colA.appendChild(ask); if(!oL && fill) fill.style.marginTop=''; dropFill(); }
     }
   }
   // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
