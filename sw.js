@@ -7,7 +7,7 @@
 //   ② activate の掃除は必ず自分の接頭辞だけ。
 //      ★Cache Storage は「オリジン単位」で、同じドメインに入口＋37本が同居している。
 //      k !== CACHE で消すと、更新のたびに他の36本のキャッシュを全部 巻き添えで消す。
-const CACHE  = 'javasilver-28654e07';
+const CACHE  = 'javasilver-f2ed152c';
 const PREFIX = 'javasilver-';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 28654e07</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 f2ed152c</span>
   </div>
 </div>
 
@@ -1915,9 +1915,14 @@ function fitLayout(){
       };
       place(false);
       if(two){
+        // ★選択肢が偶数のときは持ち上げない＝AとCを隣に並べる（2026-09-24 指摘）。
+        //   持ち上げるのは「奇数」か「持ち上げないと1画面に収まらない」ときだけ。
+        //   （奇数だと右列が1つ多くなるので、持ち上げた方が左右の段数が揃う）
+        var wantLift = (n % 2 === 1)
+                    || (document.documentElement.scrollHeight > innerHeight + 2);
         // 右列を問題文の高さぶん持ち上げ、選択肢Cが問題文の右に並ぶようにする。
         // ★問題文が右列の領域まで伸びている問題では重なるので持ち上げない。
-        var pr=card.querySelector('.prompt');
+        var pr=wantLift ? card.querySelector('.prompt') : null;
         if(pr){
           var pb=pr.getBoundingClientRect(), ob=opts.getBoundingClientRect();
           var dy=Math.round(ob.top-pb.top);
