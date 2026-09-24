@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 9a6ab15c</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 66a3cc90</span>
   </div>
 </div>
 
@@ -1794,6 +1794,9 @@ function codeBlockHtml(q){
 
 // 回答後、問題文のコードに直接ハイライト＋連結線＋結果を差し込む
 function revealFigure(q){
+  // ★#61: 左の列へ回した選択肢には「注釈が入るぶんの高さ」を先に空けてある。
+  //   ここで外すと、注釈で伸びた高さと相殺されて 回答の前後で位置が動かない
+  const oLx=document.querySelector('.leftfill'); if(oLx) oLx.style.marginTop='';
   const f=FIGS[q.id]; const box=document.getElementById('qcode');
   if(!f||!box) return;
   Object.keys(f.lines).sort((a,b)=>a-b).forEach(n=>{
@@ -1889,16 +1892,66 @@ function answerAsk(mode){
 //   位置関係が回答の前後で変わってしまう（2026-09-24 本人指示
 //   「基本的に回答前と後ではレイアウトは変わらないようにしてほしい」）。
 //   カードは問題ごとに作り直されるので、この印も毎問リセットされる。
+// 回答時に revealFigure() が入るぶん、左へ回した選択肢が下がらないよう
+// 空けておくべき margin-top を返す（既定は CSS と同じ 14px）。
+// ★高さの足し算で見積もらない。.figout の margin-bottom(16px) と .opts-left の
+//   margin-top(14px) が相殺するので、足し算だと必ず 2px 外れる（2026-09-24 実測）。
+//   実際に同じ形を作って「置かれる位置」を前後で測る。
+function reserveForReveal(box){
+  try{
+    if(!box) return 14;
+    var q=QUESTIONS[queue[pos]], f=FIGS[q.id];
+    var probe=document.createElement('div');
+    // ★実際に置く箱と同じクラスにする。違うと margin が違って予約が外れる
+    //   （2026-09-24: .opts-left のままにして 4px ずれた）
+    probe.className='leftfill'; probe.style.height='0'; probe.style.minHeight='0';
+    box.parentNode.insertBefore(probe, box.nextSibling);
+    var top0=box.getBoundingClientRect().top;                 // 動かない基準
+    var boxH0=box.getBoundingClientRect().height;             // 回答前のコード欄の高さ
+    var tmp=[];
+    if(f){
+      Object.keys(f.lines||{}).forEach(function(nn){
+        var line=box.querySelector('.figline[data-ln="'+nn+'"]'); if(!line) return;
+        var ar=document.createElement('div'); ar.className='annorow '+f.lines[nn][0];
+        ar.innerHTML='<span class="anno">'+esc(f.lines[nn][1])+'</span>';
+        line.after(ar); tmp.push(ar);
+      });
+      if(f.out){
+        var o=document.createElement('div'); o.className='figout qfigout';
+        o.textContent='\u25b8 '+f.out; box.after(o); tmp.push(o);
+      }
+    }
+    var after=probe.getBoundingClientRect().top-top0;
+    tmp.forEach(function(e){ e.remove(); });
+    probe.remove();
+    // ★「14 + 移動量」ではなく「回答後の位置 − 回答前のコード欄の高さ」。
+    //   前者だと、回答前の隔たりが figbox の margin-bottom(16px) に支配されるぶん
+    //   2px 足りなくなる（2026-09-24 実測: block では 2px ずれ／grid では合う）
+    return Math.max(14, after-boxH0);
+  }catch(e){ return 14; }
+}
+
 function fitLayout(force){
   var card=document.querySelector('.qcard'); if(!card) return;
   if(!force && card.dataset.laid==='1') return;
   card.dataset.laid='1';
+  // ★左の列へ回した「選択肢・質問欄」を、測る前に元へ戻す（幅が変われば回す量も変わる）
+  var oldF=card.querySelector('.leftfill');
+  if(oldF){
+    var o0=card.querySelector('.opts'), ca0=card.querySelector('.col-a');
+    var oL0=oldF.querySelector('.opts-left');
+    if(oL0&&o0){ while(oL0.firstChild){ o0.appendChild(oL0.firstChild); } }
+    var ab0=oldF.querySelector('.askbox');
+    if(ab0&&ca0){ ca0.appendChild(ab0); }      // 質問欄は col-a の一番後ろが元の位置
+    oldF.remove();
+  }
   card.style.gridTemplateColumns=''; card.style.width=''; card.style.maxWidth='';  // 測る前に前回の指定を消す
   card.classList.remove('wideq');
-  var pr0=card.querySelector('.prompt'); if(pr0) pr0.style.maxWidth='';
+  var pr0=card.querySelector('.prompt'); if(pr0){ pr0.style.maxWidth=''; pr0.style.width=''; }
+  var eb0=card.querySelector('.col-q > .eyebrow'); if(eb0) eb0.style.width='';
   var colA=card.querySelector('.col-a'); if(colA) colA.style.paddingTop='';
   var st0=document.getElementById('stage'); if(st0) st0.style.paddingTop='';
-  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches){
+  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse)), (min-width:660px) and (orientation:landscape)').matches){
     card.classList.remove('onecol'); centerVertically(); return; }
   // ★コードが無い問題は、収まらなくても左右に割らない（左半分が丸ごと空になるため）
   var box=card.querySelector('.col-q .figbox');
@@ -1981,8 +2034,12 @@ function fitLayout(force){
           //   持ち上げた結果 問題文の下に大きな空白ができる（2026-09-24 指摘 #58/#59）。
           //   背の差が 40px を超えるなら持ち上げない。
           //   実測: #56 は差 33px（本人「いい感じ」）／#59 は 101px／#58 は 191px
+          //   ★#62 で左右の高さを揃えているので、測る間だけ揃えを外して素の高さを見る。
+          //     揃えたままだと、C が左の A に引き伸ばされた高さで判定してしまう
+          opts.style.alignItems='start';
           var rc=opts.children[Math.floor(n/2)];        // 右列の1つ目（＝C）
           var gapH=rc ? Math.round(rc.getBoundingClientRect().height - pb.height) : 0;
+          opts.style.alignItems='';
           if(dy>0 && maxR()+16<=colR && gapH<=40){ place(true); opts.style.marginTop=(-dy)+'px'; }
           else pr.style.maxWidth='';
         }
@@ -2019,7 +2076,12 @@ function fitLayout(force){
       [].forEach.call(opts.children,function(e){e.style.gridColumn='';e.style.gridRow='';}); }
     centerVertically(); return;
   }
-  need=Math.max(320, Math.min(need, Math.round(avail*0.66)));
+  // ★下限320 も上限0.66 も『カードに収まること』より優先してはいけない。
+  //   2026-09-24 実測: 1280px で コードが列から19px はみ出し（0.66の上限が噛んだ）／
+  //   667px 横向きで need も right も下限320に張り付き、合計700px>614px で横スクロールが出た。
+  //   CAP = 右に MINOPT を残したうえで左に回せる最大。ここを超えたら はみ出すしかない。
+  var CAP=avail-GAP-PAD-MINOPT;              // 上の関門を通った時点で needRaw<=CAP
+  need=Math.min(Math.max(320, need), CAP);
   // ★右（選択肢）も"中身の実幅"で決める。固定幅にすると
   //   「[a, b, c]」のような短い選択肢のとき右半分がまるごと空白になる（2026-09-24 指摘）。
   //   max-content で折り返さない時の幅を測り、上下限で挟む
@@ -2036,7 +2098,7 @@ function fitLayout(force){
     kids.forEach(function(e,i){ e.style.width=kw[i]; });
     right=Math.min(660, Math.max(280, right+12));
   }
-  right=Math.min(right, Math.max(320, avail-need-GAP-PAD));
+  right=Math.min(right, avail-need-GAP-PAD);   // ★下限を置かない（need<=CAP なので必ず MINOPT 以上 残る）
   card.style.gridTemplateColumns='minmax(0,'+need+'px) minmax(0,'+right+'px)';
   card.style.width=Math.min(avail, need+GAP+right+PAD)+'px';   // margin:auto で中央へ
   // ★左の列が細いと、問題文が1行 数文字ずつで折り返して右が大きく空く（2026-09-24 指摘）。
@@ -2046,7 +2108,15 @@ function fitLayout(force){
   var pr2=card.querySelector('.prompt');
   if(pr2){
     var fs=parseFloat(getComputedStyle(pr2).fontSize)||17;
-    if(fs>0 && need/fs < MIN_CHARS) card.classList.add('wideq');
+    if(fs>0 && need/fs < MIN_CHARS){
+      card.classList.add('wideq');
+      // ★カードの中身の幅いっぱいに広げる（グリッドの列をまたがず、はみ出させる）。
+      //   列をまたがせる（display:contents + grid-column:1/-1）と、.col-a が
+      //   複数行にまたがって高さを奪い合い、回答後に位置が動く
+      var wide=need+GAP+right;
+      pr2.style.width=wide+'px';
+      var eb=card.querySelector('.col-q > .eyebrow'); if(eb) eb.style.width=wide+'px';
+    }
   }
   // ★選択肢Aの上端を、左のコード欄の上端に合わせる。
   //   左の列は「見出し＋設問文」が上に乗るぶんコード欄が下がるので、その差を右に足す。
@@ -2064,6 +2134,52 @@ function fitLayout(force){
       colA.style.paddingTop=cur+'px';
     }
   }
+  // ★コードの下が大きく余るなら、右の列から左へ回して余りを埋める。
+  //   ① 質問欄（2026-09-24 指摘 #66）… 読む順を崩さないのでこちらを先に
+  //   ② 選択肢の後ろ何個か（2026-09-24 指摘 #61）
+  //   どちらも「カードの高さが 8px 以上 縮むとき」だけ実行し、縮まなければ戻す。
+  //   回す数は決め打ちしない（左の列が細いと折り返して逆に伸びるため）。
+  if(colA && opts){
+    var colQ=card.querySelector('.col-q');
+    var reserveMT=reserveForReveal(box);       // 回答時に入る注釈のぶんを先に空ける
+    var rightW=Math.round(opts.getBoundingClientRect().width);
+    var fill=null;
+    var ensureFill=function(){
+      if(!fill){ fill=document.createElement('div'); fill.className='leftfill';
+        fill.style.marginTop=reserveMT.toFixed(3)+'px'; colQ.appendChild(fill); }
+      return fill; };
+    var dropFill=function(){ if(fill && !fill.children.length){ fill.remove(); fill=null; } };
+    var leftBot=function(){ var b=box.getBoundingClientRect().bottom;
+      if(fill){ var r=fill.getBoundingClientRect(); if(r.bottom>b) b=r.bottom; }
+      return b; };
+    var cardH=function(){ return Math.max(leftBot(), colA.getBoundingClientRect().bottom)
+                                 - card.getBoundingClientRect().top; };
+    var h0=cardH();
+    // ① 質問欄
+    var ask=colA.querySelector(':scope > .askbox');
+    if(ask){
+      ensureFill().appendChild(ask);
+      if(cardH() >= h0-8){ colA.appendChild(ask); dropFill(); }
+      else h0=cardH();
+    }
+    // ② 選択肢（末尾から1つずつ。右に最低2つ残す）
+    if(opts.children.length>=4){
+      var oL=null, best=h0, bestK=0, k=0;
+      while(opts.children.length>2){
+        if(!oL){ oL=document.createElement('div'); oL.className='opts-left';
+          oL.style.maxWidth=rightW+'px';
+          ensureFill(); fill.insertBefore(oL, fill.firstChild); }
+        oL.insertBefore(opts.lastElementChild, oL.firstChild);   // 末尾から・順序は保つ
+        k++;
+        var hk=cardH();
+        if(hk < best-1){ best=hk; bestK=k; } else break;
+      }
+      if(h0-best < 8) bestK=0;   // ★40→8。実測(2026-09-24) Q4 は移せば20px縮むのに
+                             //   40px の下限で却下され、186px の空白が残っていた
+      while(oL && k>bestK){ opts.appendChild(oL.firstElementChild); k--; }
+      if(oL && bestK===0){ oL.remove(); dropFill(); }
+    }
+  }
   // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
   //   カードの中の位置関係は動かないので、揃えは壊れない。
   //   2026-09-24 実測: 2056x1329 で Q19/28/33/48/77 が上下 25〜63px ずれていた
@@ -2076,9 +2192,16 @@ function centerVertically(){
   var st=document.getElementById('stage'), wp=document.querySelector('.wrap');
   if(!st||!wp) return;
   st.style.paddingTop='';
-  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches) return;
-  var free=Math.round(innerHeight - wp.getBoundingClientRect().height);
-  if(free>8) st.style.paddingTop=Math.round(free/2)+'px';
+  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse)), (min-width:660px) and (orientation:landscape)').matches) return;
+  // ★body の padding（下 76px＝左下ボタンのぶん）と margin を数に入れる。
+  //   入れないと「余りがある」と誤判定して padding を足し、結局スクロールが出る
+  //   （2026-09-24 実測: 1512幅で 72問中 39問が「収まらないのに中央寄せ済み」）
+  var bs=getComputedStyle(document.body);
+  var extra=(parseFloat(bs.paddingTop)||0)+(parseFloat(bs.paddingBottom)||0)
+           +(parseFloat(bs.marginTop)||0)+(parseFloat(bs.marginBottom)||0);
+  var free=Math.round(innerHeight - wp.getBoundingClientRect().height - extra);
+  if(free>1) st.style.paddingTop=Math.round(free/2)+'px';   // ★8→1。8px の遊びが
+  //   そのまま上下のズレとして残っていた（2026-09-24 実測 Q56 で 7px）
 }
 addEventListener('resize', function(){ fitLayout(true); });   // 画面幅が変わった時だけ測り直す
 
@@ -2113,7 +2236,7 @@ function renderQuestion(){
   q._order=order;
   order.forEach((origIdx,dispIdx)=>{
     const b=document.createElement('button');
-    b.className='opt'; b.type='button';
+    b.className='opt'; b.type='button'; b.dataset.i=dispIdx;   // ★#61: 列を移しても番号で判定できるように
     b.innerHTML=`<span class="key">${LETTERS[dispIdx]}</span><span class="txt">${esc(q.options[origIdx])}</span><span class="mark"></span>`;
     b.onclick=()=> q.multi ? toggleSel(dispIdx,b) : choose(dispIdx);
     opts.appendChild(b);
@@ -2138,7 +2261,8 @@ function submitMulti(){
   const q=QUESTIONS[queue[pos]];
   const correctDisp=new Set(q.answers.map(a=>q._order.indexOf(a)));
   const correct = selected.size===correctDisp.size && [...selected].every(x=>correctDisp.has(x));
-  document.querySelectorAll('#opts .opt').forEach((b,bi)=>{
+  document.querySelectorAll('.qcard .opt').forEach(b=>{
+    const bi=+b.dataset.i;                    // ★#61: 並び順ではなく表示番号で判定
     b.disabled=true; b.classList.remove('sel');
     const isC=correctDisp.has(bi), isS=selected.has(bi);
     if(isC){b.classList.add('correct');b.querySelector('.mark').textContent='○';}
@@ -2172,8 +2296,11 @@ function choose(i){
   const q=QUESTIONS[queue[pos]];
   const correctDisp=q._order.indexOf(q.answer);   // シャッフル後の正解位置
   const correct=i===correctDisp;
-  const btns=document.querySelectorAll('#opts .opt');
-  btns.forEach((b,bi)=>{
+  // ★#61 で選択肢の一部を左の列へ移すので、#opts の中だけを見ない。
+  //   並び順ではなく data-i（表示上の番号）で判定する
+  const btns=document.querySelectorAll('.qcard .opt');
+  btns.forEach(b=>{
+    const bi=+b.dataset.i;
     b.disabled=true;
     if(bi===correctDisp){b.classList.add('correct');b.querySelector('.mark').textContent='○';}
     if(bi===i&&!correct){b.classList.add('wrong');b.querySelector('.mark').textContent='×';}
@@ -2346,10 +2473,15 @@ renderQuestion();
     .cbtgrid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
     .cbtscreen{padding:10px}
   }
-  /* ===== ここから下は Mac（広い画面＋マウス）だけ。
+  /* ===== ここから下は「横に広い画面」だけ＝Mac、および iPad/iPhone の横向き。
+     ★縦向き（iPhone/iPad を立てて持つ）は今までどおり変えない
+       （2026-09-24 本人指示「iPadとiPhoneの横向きの時も同じUIにしてほしい」
+        「縦向きのUIは文字幅以外は大きく変える必要ない」）。
+     ★下限 660px は iPhone SE の横向き(667px)が入る幅。これ未満（iPadのSplit View等）は
+       2列にすると読めないので従来のまま。
      ★必ず基本ルールより後ろに置くこと。前に置くと同じ強さの指定が後勝ちで潰れる
        （2026-09-24に実際に7件が死んでいて「変わってない」と2回言われた）===== */
-  @media (min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse)){
+  @media (min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse)), (min-width:660px) and (orientation:landscape){
     /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
     /* 縦スクロールバーの幅を常に確保する。問題ごとに出たり消えたりすると
        実効幅が15px変わってレイアウトが横に跳ねるため。
@@ -2374,15 +2506,28 @@ renderQuestion();
        右側が大きく空いていた。.col-q を display:contents にして
        その子（eyebrow / prompt / figbox）を直接グリッドに載せる。
        ★display:block より後ろ かつ セレクタが詳しいので、こちらが勝つ */
-    .qcard.wideq:not(.onecol) .col-q{display:contents}
-    .qcard.wideq:not(.onecol) .col-q > *{grid-column:1}
-    /* ★行を明示する。自動配置に任せると、回答時に revealFigure() が .col-q へ
-       図解を1個 足した瞬間に .col-a が1行ぶん下へ落ちる
-       （2026-09-24 実測: Q4 で選択肢Aがコードより 407px 下がった）。
-       display:contents なので、後から増えた子もグリッド項目になるのが原因 */
-    .qcard.wideq:not(.onecol) .col-q > .eyebrow{grid-column:1 / -1;grid-row:1}
-    .qcard.wideq:not(.onecol) .col-q > .prompt{grid-column:1 / -1;grid-row:2}
-    .qcard.wideq:not(.onecol) .col-a{grid-column:2;grid-row:3 / span 99}
+    /* ★display:contents は使わない（2026-09-24 に2度 痛い目を見た）。
+       子が直接グリッド項目になるため、
+         ① 後から増えた子（図解・回した選択肢）が自動配置で他とぶつかる（#54）
+         ② .col-a が複数行にまたがり、回答して解説が伸びると行の高さを奪い合って
+            コードや選択肢が動く（実測 最大19px）
+       代わりに .col-q は普通の1マスのまま、見出しと問題文だけを
+       右の列の上へ「はみ出させる」（幅は fitLayout() が px で入れる）。
+       右の列の上端は揃え処理でコード欄の高さまで下げてあるので重ならない */
+    .qcard.wideq:not(.onecol) .col-q > .eyebrow,
+    .qcard.wideq:not(.onecol) .col-q > .prompt{max-width:none}
+    /* ★コードの下が余るとき、右の列から「質問欄」と「後ろの選択肢」をここへ回す。
+       　 2026-09-24 指摘 #61「左の下半分が余ってるから、右の選択肢を2つくらい左に持ってきてほしい」
+       　 2026-09-24 指摘 #66「例えばこういうのは質問欄をコードの下（左側）に持ってきて」
+       margin-top は fitLayout() が「回答時に注釈が入るぶん」を予約する（回答の前後で動かさないため）*/
+    /* ★display:flow-root（＝子とのマージン相殺を止める）。止めないと、中に入れた
+       .askbox の margin-top:20px が親と相殺して、空の測定用ダミーとの間に
+       20-16=4px の差が出る（2026-09-24 実測: 回答後に質問欄が4px下がった）*/
+    .qcard:not(.onecol) .leftfill{display:flow-root;margin-top:14px}
+    .qcard:not(.onecol) .leftfill > :first-child{margin-top:0}
+    .qcard:not(.onecol) .leftfill > * + *{margin-top:20px}
+    /* 回した選択肢の幅は右の列に合わせる（コード列いっぱいに伸ばすと左右で箱が揃わない）*/
+    .qcard:not(.onecol) .opts-left{display:flex;flex-direction:column;gap:12px}
     /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
        行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
     .qcard.onecol{display:block;max-width:1100px;margin-left:auto;margin-right:auto}
@@ -2394,9 +2539,11 @@ renderQuestion();
        1列目の段数は選択肢の数から fitLayout() が決める（CSSでは割り算できない） */
     .qcard.onecol.nofig .opts.two{display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start;
-      /* ★行の高さに引き伸ばさない。伸ばすと、右に6行のコード選択肢がある時
-         左の短い選択肢が同じ高さの空箱になる（2026-09-24 指摘 #57）*/
-      align-items:start}
+      /* ★同じ段の左右は同じ高さにする（2026-09-24 本人指示 #62「この枠の大きさ、左は
+         右の大きさに合わせて」／#63「こういうのも」＝6行のコード選択肢と並ぶ場合も同じ）。
+         ★一時 align-items:start にしていたのは私の独断で、本人の指示ではなかった。
+         stretch は grid の既定値なので、指定を書かないのが正解 */
+      align-items:stretch}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
