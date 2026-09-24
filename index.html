@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 f2ed152c</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 6626b9f8</span>
   </div>
 </div>
 
@@ -1889,7 +1889,7 @@ function fitLayout(){
   card.style.gridTemplateColumns=''; card.style.width='';   // 測る前に前回の指定を消す
   var colA=card.querySelector('.col-a'); if(colA) colA.style.paddingTop='';
   var st0=document.getElementById('stage'); if(st0) st0.style.paddingTop='';
-  if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches){
+  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches){
     card.classList.remove('onecol'); centerVertically(); return; }
   // ★コードが無い問題は、収まらなくても左右に割らない（左半分が丸ごと空になるため）
   var box=card.querySelector('.col-q .figbox');
@@ -1899,7 +1899,21 @@ function fitLayout(){
     // 選択肢が4つ以上のときだけ2列。3つ以下は1:2に割れて不格好なので1列のまま
     var n=opts?opts.children.length:0;
     if(opts){
+      // ★2列にするかは幅の決め打ちではなく「中身の実幅」で決める（2026-09-24 指摘）。
+      //   一番幅の広い選択肢が列幅に収まる（＝2列にしても折り返しが増えない）ときだけ2列。
+      //   ★.opt には width:100% が効いているので、親だけ max-content にしても
+      //     「100%＝グリッド領域の幅」が返る。子を1つずつ max-content にして測る。
       var two = n>=4;
+      if(two){
+        opts.classList.remove('two');
+        [].forEach.call(opts.children,function(e){ e.style.gridColumn=''; e.style.gridRow=''; });
+        var full=opts.getBoundingClientRect().width;
+        var kids0=[].slice.call(opts.children), kw0=[], natMax=0;
+        kids0.forEach(function(e){ kw0.push(e.style.width); e.style.width='max-content'; });
+        kids0.forEach(function(e){ var w=e.getBoundingClientRect().width; if(w>natMax) natMax=w; });
+        kids0.forEach(function(e,i){ e.style.width=kw0[i]; });
+        two = natMax <= (full-12)/2 + 1;      // gap 12 を引いた列幅に収まるか
+      }
       opts.classList.toggle('two', two);
       opts.style.marginTop='';
       // ★1つずつ列と段を指定する。grid-auto-flow:column に段数を渡す書き方だと
@@ -1954,6 +1968,17 @@ function fitLayout(){
   var avail=card.clientWidth;
   var GAP=24, PAD=36;                                  // column-gap と カード左右padding(18*2)
   var need=Math.ceil(w+lead+64);   // 64 = 行の左右padding(18*2)+番号との隙間(10)+遊び(18)
+  // ★左右に割るだけの幅が無いなら割らない（2026-09-24 指摘「文字のレイアウトに対して動的に」）。
+  //   無理に割ると、コードが列からはみ出して右端が切れる
+  //   （実測 1000px幅で コード右余白 -215px・選択肢の右の余り -305px）。
+  //   縦に長くなっても1列のままの方が読める。
+  var MINOPT=300;                                      // 選択肢の列として最低限使える幅
+  if(need + GAP + PAD + MINOPT > avail){
+    card.classList.add('onecol');
+    if(opts){ opts.classList.remove('two'); opts.style.marginTop='';
+      [].forEach.call(opts.children,function(e){e.style.gridColumn='';e.style.gridRow='';}); }
+    centerVertically(); return;
+  }
   need=Math.max(320, Math.min(need, Math.round(avail*0.66)));
   // ★右（選択肢）も"中身の実幅"で決める。固定幅にすると
   //   「[a, b, c]」のような短い選択肢のとき右半分がまるごと空白になる（2026-09-24 指摘）。
@@ -1998,7 +2023,7 @@ function centerVertically(){
   var st=document.getElementById('stage'), wp=document.querySelector('.wrap');
   if(!st||!wp) return;
   st.style.paddingTop='';
-  if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches) return;
+  if(!matchMedia('(min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse))').matches) return;
   var free=Math.round(innerHeight - wp.getBoundingClientRect().height);
   if(free>8) st.style.paddingTop=Math.round(free/2)+'px';
 }
@@ -2271,7 +2296,7 @@ renderQuestion();
   /* ===== ここから下は Mac（広い画面＋マウス）だけ。
      ★必ず基本ルールより後ろに置くこと。前に置くと同じ強さの指定が後勝ちで潰れる
        （2026-09-24に実際に7件が死んでいて「変わってない」と2回言われた）===== */
-  @media (min-width:1080px) and (pointer:fine) and (hover:hover){
+  @media (min-width:820px) and (pointer:fine) and (hover:hover) and (not (any-pointer:coarse)){
     /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
     /* 縦スクロールバーの幅を常に確保する。問題ごとに出たり消えたりすると
        実効幅が15px変わってレイアウトが横に跳ねるため。
