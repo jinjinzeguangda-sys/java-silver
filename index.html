@@ -282,7 +282,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 103f8ab9</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 098d3bb5</span>
   </div>
 </div>
 
@@ -1899,7 +1899,7 @@ function answerAsk(mode){
 //   実際に同じ形を作って「置かれる位置」を前後で測る。
 function reserveForReveal(box){
   try{
-    if(!box) return 14;
+    if(!box) return {inner:0, outer:14};
     var q=QUESTIONS[queue[pos]], f=FIGS[q.id];
     var probe=document.createElement('div');
     // ★実際に置く箱と同じクラスにする。違うと margin が違って予約が外れる
@@ -1922,13 +1922,19 @@ function reserveForReveal(box){
       }
     }
     var after=probe.getBoundingClientRect().top-top0;
+    var boxH1=box.getBoundingClientRect().height;             // 回答後のコード欄の高さ
     tmp.forEach(function(e){ e.remove(); });
     probe.remove();
     // ★「14 + 移動量」ではなく「回答後の位置 − 回答前のコード欄の高さ」。
     //   前者だと、回答前の隔たりが figbox の margin-bottom(16px) に支配されるぶん
     //   2px 足りなくなる（2026-09-24 実測: block では 2px ずれ／grid では合う）
-    return Math.max(14, after-boxH0);
-  }catch(e){ return 14; }
+    // ★さらに「箱の中(注釈の行)」と「箱の外(▸結果の行)」に分ける。
+    //   中のぶんを空白として空けると、左へ回した選択肢がコードから離れて浮く
+    //   （2026-09-25 指摘 #70「dの選択肢の位置がおかしい」で 220px 浮いていた）。
+    //   中のぶんはコード欄自身の min-height にすれば、選択肢はコードのすぐ下に付く
+    var inner=Math.max(0, Math.round(boxH1-boxH0));
+    return {inner:inner, outer:Math.max(14, Math.round(after-boxH0-inner))};
+  }catch(e){ return {inner:0, outer:14}; }
 }
 
 function fitLayout(force){
@@ -1951,6 +1957,7 @@ function fitLayout(force){
     if(ab0&&ca0){ ca0.appendChild(ab0); }      // 質問欄は col-a の一番後ろが元の位置
     oldF.remove();
   }
+  var bx0=card.querySelector('.col-q .figbox'); if(bx0) bx0.style.minHeight='';   // ★前回の予約を消してから測る
   card.style.gridTemplateColumns=''; card.style.width=''; card.style.maxWidth='';  // 測る前に前回の指定を消す
   card.classList.remove('wideq');
   var pr0=card.querySelector('.prompt'); if(pr0){ pr0.style.maxWidth=''; pr0.style.width=''; }
@@ -2148,7 +2155,8 @@ function fitLayout(force){
   if(colA && opts){
     var colQ=card.querySelector('.col-q');
     // ★回答済みなら注釈はもう入っているので予約しない（二重に空けてしまう）
-    var reserveMT = answered ? 14 : reserveForReveal(box);
+    var rsv = answered ? {inner:0,outer:14} : reserveForReveal(box);
+    var boxH0=Math.round(box.getBoundingClientRect().height);
     var rightW=Math.round(opts.getBoundingClientRect().width);
     var fill=null;
     // ★予約枠(marginTop)を付けるのは「選択肢」を回すときだけ。
@@ -2157,7 +2165,10 @@ function fitLayout(force){
     //   「これもうちょっと質問欄上にできない？」）
     var ensureFill=function(reserve){
       if(!fill){ fill=document.createElement('div'); fill.className='leftfill'; colQ.appendChild(fill); }
-      fill.style.marginTop = reserve ? reserveMT.toFixed(3)+'px' : '';   // '' = CSS既定の 14px
+      // ★予約は2つに分ける: 箱の中のぶんは コード欄の min-height、
+      //   箱の外のぶん（▸結果の行）だけを余白で取る
+      fill.style.marginTop = reserve ? rsv.outer+'px' : '';   // '' = CSS既定の 14px
+      box.style.minHeight  = reserve ? (boxH0+rsv.inner)+'px' : '';
       return fill; };
     var dropFill=function(){ if(fill && !fill.children.length){ fill.remove(); fill=null; } };
     var leftBot=function(){ var b=box.getBoundingClientRect().bottom;
@@ -2184,14 +2195,16 @@ function fitLayout(force){
       if(h0-best < 8) bestK=0;   // ★40→8。実測(2026-09-24) Q4 は移せば20px縮むのに
                              //   40px の下限で却下され、186px の空白が残っていた
       while(oL && k>bestK){ opts.appendChild(oL.firstElementChild); k--; }
-      if(oL && bestK===0){ oL.remove(); oL=null; if(fill) fill.style.marginTop=''; dropFill(); }
+      if(oL && bestK===0){ oL.remove(); oL=null;
+        if(fill) fill.style.marginTop=''; box.style.minHeight=''; dropFill(); }
       else h0=cardH();
     }
     // ② 質問欄 … 選択肢の後ろへ。選択肢を回していないなら予約せずコードのすぐ下（#69）
     var ask=colA.querySelector(':scope > .askbox');
     if(ask){
       ensureFill(!!oL).appendChild(ask);
-      if(cardH() >= h0-8){ colA.appendChild(ask); if(!oL && fill) fill.style.marginTop=''; dropFill(); }
+      if(cardH() >= h0-8){ colA.appendChild(ask);
+        if(!oL && fill){ fill.style.marginTop=''; box.style.minHeight=''; } dropFill(); }
     }
   }
   // ★揃えの padding でカードの高さが変わるので、中央寄せを取り直す。
