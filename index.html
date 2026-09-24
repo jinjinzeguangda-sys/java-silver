@@ -119,12 +119,11 @@
     .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
       column-gap:28px;align-items:stretch;padding:16px 22px;overflow:hidden}
     .col-q,.col-a{display:block;min-width:0;min-height:0;overflow:auto}
-    /* コードが無い問題は左右に割らない（左半分が丸ごと空になるため）。
-       判定は「左の列に図がある問題か」。回答後に右へ挿さる図には反応させない */
-    .qcard:not(:has(.col-q .figbox)){display:block;overflow:auto;
+    /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
+       行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
+    .qcard.onecol{display:block;overflow:auto;
       max-width:900px;margin-left:auto;margin-right:auto}
-    .qcard:not(:has(.col-q .figbox)) .col-q,
-    .qcard:not(:has(.col-q .figbox)) .col-a{display:contents}
+    .qcard.onecol .col-q,.qcard.onecol .col-a{display:contents}
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
@@ -1908,6 +1907,18 @@ function answerAsk(mode){
   }
   out.textContent=res;
 }
+// 1カラムで1画面に収まるならそのまま、はみ出す時だけ左右2カラムに割る。
+// 行数の閾値では決めない（コードが短くても選択肢が長ければ収まらないため）。
+// Macだけの挙動。iPhone/iPad は元々1カラムなので何もしない。
+function fitLayout(){
+  var card=document.querySelector('.qcard'); if(!card) return;
+  if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches){
+    card.classList.remove('onecol'); return; }
+  card.classList.add('onecol');                       // まず1カラムで測る
+  if(card.scrollHeight > card.clientHeight + 2) card.classList.remove('onecol');
+}
+addEventListener('resize', fitLayout);
+
 function renderQuestion(){
   answered=false; selected=new Set();
   const q=QUESTIONS[queue[pos]];
@@ -1949,6 +1960,7 @@ function renderQuestion(){
     bar.innerHTML=`<button class="btn primary" type="button" id="submitBtn" onclick="submitMulti()" disabled>確定する（${q.answers.length}個選ぶ）</button>`;
     opts.after(bar);
   }
+  fitLayout();
 }
 
 function toggleSel(dispIdx,btn){
@@ -1988,6 +2000,7 @@ function submitMulti(){
       <button class="btn primary" type="button" onclick="next()">${last?'結果へ →':'次の問題 →'}</button>
     </div>`;
   revealFigure(q);
+  fitLayout();
 }
 
 function choose(i){
@@ -2022,6 +2035,7 @@ function choose(i){
       <button class="btn primary" type="button" onclick="next()">${last?'結果へ →':'次の問題 →'}</button>
     </div>`;
   revealFigure(q);
+  fitLayout();
 }
 
 function next(){

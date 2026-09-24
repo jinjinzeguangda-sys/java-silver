@@ -1,6 +1,6 @@
 // 目的: 初回に読んだものをキャッシュし、以降オフラインでも開けるようにする。
 // 方針: cache-first（教材は変わらないので速さ優先）。版を上げたら CACHE を変える。
-const CACHE = 'javasilver-3eb16772';
+const CACHE = 'javasilver-c07aa2bf';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
