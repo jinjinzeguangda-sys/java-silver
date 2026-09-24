@@ -114,8 +114,16 @@
     .wrap{max-width:1600px;padding:4px 18px 10px}
     /* 問題画面は1画面に収める（上下スクロールを出さない）。
        :has が無いブラウザでは従来どおり縦に伸びるだけで壊れない */
+    /* 問題画面のときだけ、ページ自体のスクロールを止める。
+       成績画面・問題選択画面（.qcard が無い）では従来どおり縦に伸びて普通にスクロールする。
+       カード内部は overflow:auto なので、収まらない内容も必ず読める */
+    html:has(.qcard),body:has(.qcard){height:100%;overflow:hidden}
     .wrap:has(.qcard){height:100vh;overflow:hidden;display:flex;flex-direction:column}
-    .wrap:has(.qcard) .qcard{min-height:0}
+    /* ★カードは .wrap の直下ではなく #stage の中。高さの制約を stage 経由で
+       カードまで届かせないと、カードは伸び放題になり fitLayout が常に
+       「収まっている」と誤判定し、あふれた「次の問題」ボタンが切り落とされる */
+    .wrap:has(.qcard) #stage{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+    .wrap:has(.qcard) #stage>.qcard{flex:0 1 auto;min-height:0}
     .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
       column-gap:28px;align-items:stretch;padding:16px 22px;overflow:hidden}
     .col-q,.col-a{display:block;min-width:0;min-height:0;overflow:auto}
