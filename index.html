@@ -281,7 +281,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 81caf586</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 0d07f185</span>
   </div>
 </div>
 
@@ -1886,8 +1886,10 @@ function answerAsk(mode){
 function fitLayout(){
   var card=document.querySelector('.qcard'); if(!card) return;
   card.style.gridTemplateColumns=''; card.style.width='';   // 測る前に前回の指定を消す
+  var colA=card.querySelector('.col-a'); if(colA) colA.style.paddingTop='';
+  var st0=document.getElementById('stage'); if(st0) st0.style.paddingTop='';
   if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches){
-    card.classList.remove('onecol'); return; }
+    card.classList.remove('onecol'); centerVertically(); return; }
   // ★コードが無い問題は、収まらなくても左右に割らない（左半分が丸ごと空になるため）
   var box=card.querySelector('.col-q .figbox');
   var opts=card.querySelector('.opts');
@@ -1898,22 +1900,42 @@ function fitLayout(){
     if(opts){
       var two = n>=4;
       opts.classList.toggle('two', two);
+      opts.style.marginTop='';
       // ★1つずつ列と段を指定する。grid-auto-flow:column に段数を渡す書き方だと
       //   5個が 2/2/1 の「3列」に溢れる（2026-09-24 実測）。左は floor(n/2) 個。
       var k=Math.floor(n/2);
-      [].forEach.call(opts.children,function(e,i){
-        if(!two){ e.style.gridColumn=''; e.style.gridRow=''; return; }
-        e.style.gridColumn = (i<k) ? '1' : '2';
-        e.style.gridRow    = ((i<k ? i : i-k) + 1);
-      });
+      var place=function(lift){
+        [].forEach.call(opts.children,function(e,i){
+          if(!two){ e.style.gridColumn=''; e.style.gridRow=''; return; }
+          e.style.gridColumn = (i<k) ? '1' : '2';
+          // lift のときは左を2段目から始めて、1段目を右列だけにする
+          e.style.gridRow    = (i<k ? i + (lift?2:1) : i-k+1);
+        });
+      };
+      place(false);
+      if(two){
+        // 右列を問題文の高さぶん持ち上げ、選択肢Cが問題文の右に並ぶようにする。
+        // ★問題文が右列の領域まで伸びている問題では重なるので持ち上げない。
+        var pr=card.querySelector('.prompt');
+        if(pr){
+          var pb=pr.getBoundingClientRect(), ob=opts.getBoundingClientRect();
+          var dy=Math.round(ob.top-pb.top);
+          var rgx=document.createRange(); rgx.selectNodeContents(pr);
+          var mr=0;
+          [].forEach.call(rgx.getClientRects(),function(q){ if(q.right>mr) mr=q.right; });
+          var colR=ob.left + (ob.width-12)/2 + 12;          // 右列の左端（gap 12）
+          if(dy>0 && mr+16<=colR){ place(true); opts.style.marginTop=(-dy)+'px'; }
+        }
+      }
     }
+    centerVertically();
     return;
   }
   card.classList.remove('nofig');
-  if(opts){ opts.classList.remove('two'); opts.style.gridTemplateRows='';
+  if(opts){ opts.classList.remove('two'); opts.style.gridTemplateRows=''; opts.style.marginTop='';
     [].forEach.call(opts.children,function(e){e.style.gridColumn='';e.style.gridRow='';}); }
   card.classList.add('onecol');                       // まず1列で測る
-  if(document.documentElement.scrollHeight <= innerHeight + 2) return;  // 1列で1画面に収まった
+  if(document.documentElement.scrollHeight <= innerHeight + 2){ centerVertically(); return; }  // 1列で収まった
   card.classList.remove('onecol');
   // 2列にするときは、左の列をコードの実幅ぶんにし、
   // 余った幅は右へ回さずカードごと縮めて中央へ寄せる。
@@ -1924,23 +1946,55 @@ function fitLayout(){
   var no=box.querySelector('.fno');
   var lead=no?no.getBoundingClientRect().width:24;
   var avail=card.clientWidth;
-  var GAP=24, PAD=28;                                  // column-gap と カード左右padding(14*2)
-  var need=Math.ceil(w+lead+46);
+  var GAP=24, PAD=36;                                  // column-gap と カード左右padding(18*2)
+  var need=Math.ceil(w+lead+64);   // 64 = 行の左右padding(18*2)+番号との隙間(10)+遊び(18)
   need=Math.max(320, Math.min(need, Math.round(avail*0.66)));
   // ★右（選択肢）も"中身の実幅"で決める。固定幅にすると
   //   「[a, b, c]」のような短い選択肢のとき右半分がまるごと空白になる（2026-09-24 指摘）。
   //   max-content で折り返さない時の幅を測り、上下限で挟む
   var right=420;
   if(opts){
-    var keep=opts.style.width;
+    // ★子の .opt に width:100% が効いているので、親だけ max-content にしても
+    //   「100% = グリッド領域の幅」がそのまま返る（＝測定が効かない。2026-09-24 実測で発覚）。
+    //   子にも max-content を当てて、本当の中身の幅を出す。
+    var keep=opts.style.width, kids=[].slice.call(opts.children), kw=[];
+    kids.forEach(function(e){ kw.push(e.style.width); e.style.width='max-content'; });
     opts.style.width='max-content';
     right=Math.ceil(opts.getBoundingClientRect().width);
     opts.style.width=keep;
-    right=Math.min(660, Math.max(400, right+10));
+    kids.forEach(function(e,i){ e.style.width=kw[i]; });
+    right=Math.min(660, Math.max(280, right+12));
   }
   right=Math.min(right, Math.max(320, avail-need-GAP-PAD));
   card.style.gridTemplateColumns='minmax(0,'+need+'px) minmax(0,'+right+'px)';
   card.style.width=Math.min(avail, need+GAP+right+PAD)+'px';   // margin:auto で中央へ
+  // ★選択肢Aの上端を、左のコード欄の上端に合わせる。
+  //   左の列は「見出し＋設問文」が上に乗るぶんコード欄が下がるので、その差を右に足す。
+  //   ここは幅を確定させた後でないと、設問文の折り返し行数が変わって値がずれる。
+  centerVertically();          // ★先に中央寄せ。高さが変わるので揃えはその後
+  if(colA){
+    // ★基準は「右列の上端」ではなく「選択肢Aの箱の上端」。
+    //   1回の計算で決め打ちすると、padding を入れた反動で折り返しが変わり 7px 残る
+    //   （2026-09-24 実測 0/66）。合うまで測り直す（最大3回）。
+    var ref=(opts&&opts.children[0])||colA, cur=0;
+    for(var it=0; it<5; it++){
+      var d=Math.round(box.getBoundingClientRect().top - ref.getBoundingClientRect().top);
+      if(Math.abs(d)<=1) break;
+      cur=Math.max(0, cur+d);
+      colA.style.paddingTop=cur+'px';
+    }
+  }
+}
+
+// 1画面に収まる問題は、上に貼り付かず縦の中央へ。
+// ★収まらない問題では何もしない（中央寄せで上が画面外に切れると戻せなくなる）
+function centerVertically(){
+  var st=document.getElementById('stage'), wp=document.querySelector('.wrap');
+  if(!st||!wp) return;
+  st.style.paddingTop='';
+  if(!matchMedia('(min-width:1080px) and (pointer:fine) and (hover:hover)').matches) return;
+  var free=Math.round(innerHeight - wp.getBoundingClientRect().height);
+  if(free>8) st.style.paddingTop=Math.round(free/2)+'px';
 }
 addEventListener('resize', fitLayout);
 
@@ -2213,13 +2267,22 @@ renderQuestion();
        （2026-09-24に実際に7件が死んでいて「変わってない」と2回言われた）===== */
   @media (min-width:1080px) and (pointer:fine) and (hover:hover){
     /* 左右の余白を詰める（18px→10px）。画面が広いほど本文に回す */
-    .wrap{max-width:1900px;padding:4px 8px 10px}
+    /* 縦スクロールバーの幅を常に確保する。問題ごとに出たり消えたりすると
+       実効幅が15px変わってレイアウトが横に跳ねるため。
+       ★揃えのズレ(7px)の原因ではなかった（A/Bで棄却。真因は decorate()）*/
+    html{scrollbar-gutter:stable}
+    /* 左paddingだけ厚くして中身を気持ち右へ寄せる（2026-09-24 指摘）*/
+    .wrap{max-width:1900px;padding:4px 8px 10px 28px}
+    /* ★縦中央寄せに min-height:100vh / flex は使わない。
+       scrollHeight が常に viewport 以上になり、「1列で1画面に収まるか」の
+       判定が必ず失敗する（2026-09-24 実測: 全80問が2列・2つの幅で数値が完全一致）。
+       余りの半分を #stage の padding-top に入れる形で fitLayout() が行う */
     /* 問題画面は1画面に収める（上下スクロールを出さない）。
        :has が無いブラウザでは従来どおり縦に伸びるだけで壊れない */
     /* ★スクロールはページ全体で1本だけ。列ごとに出さない
        （1画面に収まる問題ではそもそもスクロールバーが出ない） */
     .qcard{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
-      column-gap:24px;align-items:start;padding:14px 14px;margin-left:auto;margin-right:auto}
+      column-gap:24px;align-items:start;padding:14px 18px;margin-left:auto;margin-right:auto}
     .col-q,.col-a{display:block;min-width:0}
     /* 左右に割るのは「1カラムだと1画面に収まらない問題」だけ。
        行数の閾値では決めない（勘になる）。実測して fitLayout() が onecol を付け外しする */
@@ -2235,8 +2298,9 @@ renderQuestion();
     .card:not(.qcard){max-width:760px;margin-left:auto;margin-right:auto}
     .prompt{font-size:17px;margin-bottom:18px;line-height:1.7}
     /* 行間と余白を広げる（PCは画面に余裕があるので詰める必要がない）*/
-    .figbox{line-height:1.8;padding:12px 0}
-    .figline{padding:3px 12px}
+    .figbox{line-height:1.7;padding:12px 0}
+    /* コードの左右の余白。12pxだと「ピッタリすぎる」と言われたので18px（2026-09-24）*/
+    .figline{padding:2px 18px}
     .opts{gap:12px}
     .opt{padding:15px 16px;line-height:1.65}
     .exp{line-height:1.85}
@@ -2435,7 +2499,12 @@ renderQuestion();
 
   // --- 既存関数をラップ（中身は書き換えない） ---
   var _render=renderQuestion;
-  renderQuestion=function(){ _render.apply(this,arguments); decorate(); paint(); };
+  renderQuestion=function(){ _render.apply(this,arguments); decorate(); paint();
+    // ★decorate() は「後で見直す」ボタンと「前回：…」を .eyebrow に足すので、
+    //   その行の高さが 19.2px → 26.0px（+6.8px）に変わる。_render の中の
+    //   fitLayout() はそれより前に走っているため、揃えが毎問ぴったり 7px ずれていた
+    //   （2026-09-24 実測 0/66）。足し終わってから測り直す。
+    if(typeof fitLayout==='function') fitLayout(); };
 
   if(typeof choose==='function'){
     var _choose=choose;
