@@ -7,7 +7,7 @@
 //   ② activate の掃除は必ず自分の接頭辞だけ。
 //      ★Cache Storage は「オリジン単位」で、同じドメインに入口＋37本が同居している。
 //      k !== CACHE で消すと、更新のたびに他の36本のキャッシュを全部 巻き添えで消す。
-const CACHE  = 'javasilver-098d3bb5';
+const CACHE  = 'javasilver-5da658e2';
 const PREFIX = 'javasilver-';
 // ★接頭辞だけだと、名前が接頭辞になっている兄弟（javasilver-drill のような追加）まで消す。
 //   末尾が index.html の md5(8桁) であることまで見る（2026-09-25 実測で site 側が実際に踏んだ）
