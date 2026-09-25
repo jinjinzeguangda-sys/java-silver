@@ -86,6 +86,16 @@
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box}
+  /* ★回答して解説が出ると縦スクロールが発生し、古典的スクロールバーの環境では
+     ビューポートが15px狭くなって選択肢が折り返す（＝回答の前後で位置が動く）。
+     最初から場所を空けておく。
+     ★スマホ・タブレットを条件で外す。「オーバーレイ型なら無効」は仕様上そうなるはずだが、
+       このヘッドレスChromeでは再現できず未検証だった（--enable-features=OverlayScrollbar が
+       効かず、gutter 無しの版まで .opts が 289px になった＝2026-09-25 実測）。
+       条件で外せば仕様の解釈に頼らずに済み、coarse/fine の両方を実測で確かめられる。
+     ★古典的スクロールバーが出るのはデスクトップで、そこは普通 820px 以上＝
+       広いUIの @media にある同じ1行が既に効いている。ここは窓を狭くした時のための保険 */
+  @media (hover:hover) and (pointer:fine){ html{scrollbar-gutter:stable} }
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
     -webkit-font-smoothing:antialiased;margin:0}
   .wrap{max-width:660px;margin:0 auto;padding:20px 18px 64px}
@@ -136,7 +146,15 @@
     border:1.5px solid var(--border);border-radius:7px;min-width:26px;height:26px;display:flex;
     align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px;transition:.15s}
   .opt .txt{flex:1;padding-top:1px;white-space:pre-wrap;overflow-wrap:anywhere}
-  .opt .mark{font-size:18px;line-height:1.3;flex:0 0 auto;opacity:0}
+  /* ★回答すると ○/× が入って幅が増え、選択肢の文章が1行折り返すことがある
+     （＝回答の前後で位置が動く）。空のうちから同じ幅を確保しておく。
+     実測 2026-09-25: ○=16.27px / ×=10.89px ＝ 正解と不正解でも幅が違っていた。
+     「回答で選択肢の高さが変わった問題」の実測（本文幅 390px・スマホと同じ粗いポインタ）:
+       oop 8/30 → 0/30 ／ java-bronze 4/60 → 0/60 ／ regex 3/30 → 0/30 ／ python 0/30 → 0/30
+     ★python/regex の一部の跳ねは別原因（縦スクロールバーで幅が15px縮む）で、
+       これを直しても消えない。2x2 の対照実験で切り分けた。 */
+  .opt .mark{font-size:18px;line-height:1.3;flex:0 0 auto;opacity:0;
+    min-width:1em;text-align:center}
   .opt.correct{border-color:var(--ok);background:var(--ok-soft)}
   .opt.correct .key{border-color:var(--ok);background:var(--ok);color:#fff}
   .opt.correct .mark{opacity:1;color:var(--ok)}
