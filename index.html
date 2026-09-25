@@ -89,13 +89,15 @@
   /* ★回答して解説が出ると縦スクロールが発生し、古典的スクロールバーの環境では
      ビューポートが15px狭くなって選択肢が折り返す（＝回答の前後で位置が動く）。
      最初から場所を空けておく。
-     ★スマホ・タブレットを条件で外す。「オーバーレイ型なら無効」は仕様上そうなるはずだが、
-       このヘッドレスChromeでは再現できず未検証だった（--enable-features=OverlayScrollbar が
-       効かず、gutter 無しの版まで .opts が 289px になった＝2026-09-25 実測）。
-       条件で外せば仕様の解釈に頼らずに済み、coarse/fine の両方を実測で確かめられる。
-     ★古典的スクロールバーが出るのはデスクトップで、そこは普通 820px 以上＝
-       広いUIの @media にある同じ1行が既に効いている。ここは窓を狭くした時のための保険 */
-  @media (hover:hover) and (pointer:fine){ html{scrollbar-gutter:stable} }
+     ★2026-09-25: ここは @media (hover:hover) and (pointer:fine) で囲っていたが、外した。
+       B案（○/×を出さない）にしたら「古典的スクロールバー＋指で触る」環境で
+       8アプリ20問が跳ねた（A案は文字幅が1em狭くて既に折り返していたので隠れていただけ）。
+     ★scrollbar-gutter ではなく overflow-y:scroll を使う。Safari が scrollbar-gutter に
+       対応したのは 18.2（2024-12）で、古いiPhoneでは効かない。overflow-y:scroll は昔から効く。
+     ★オーバーレイ型（iPhone/Android/既定のmacOS）はバーが幅を食わないので影響なし。
+       実測（オーバーレイ相当・10本300問）: .opts の幅は 304px のまま／跳ね0。
+       古典的バーの側も 289→289 で不動・跳ね0（同じ10本300問）。 */
+  html{overflow-y:scroll}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
     -webkit-font-smoothing:antialiased;margin:0}
   .wrap{max-width:660px;margin:0 auto;padding:20px 18px 64px}
@@ -146,15 +148,17 @@
     border:1.5px solid var(--border);border-radius:7px;min-width:26px;height:26px;display:flex;
     align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px;transition:.15s}
   .opt .txt{flex:1;padding-top:1px;white-space:pre-wrap;overflow-wrap:anywhere}
-  /* ★回答すると ○/× が入って幅が増え、選択肢の文章が1行折り返すことがある
-     （＝回答の前後で位置が動く）。空のうちから同じ幅を確保しておく。
+  /* ★B案（2026-09-25 本人決定）: ○/× は出さない。正誤は色の3点で示す
+     ―― 枠線(.opt.correct/.wrong) ・ 背景 ・ A/B/C/D バッジ(.key)の塗り。
+     display:none なら flex の gap も生まれないので、回答の前後で幅が1pxも動かない。
+     ★A案（min-width:1em で場所を空ける）は跳ね0だが、文字幅が1文字ぶん減る代償があった
+       （oop 13/30問が縦に伸び、30問で+431px）。B案は代償ゼロ。
      実測 2026-09-25: ○=16.27px / ×=10.89px ＝ 正解と不正解でも幅が違っていた。
-     「回答で選択肢の高さが変わった問題」の実測（本文幅 390px・スマホと同じ粗いポインタ）:
-       oop 8/30 → 0/30 ／ java-bronze 4/60 → 0/60 ／ regex 3/30 → 0/30 ／ python 0/30 → 0/30
-     ★python/regex の一部の跳ねは別原因（縦スクロールバーで幅が15px縮む）で、
-       これを直しても消えない。2x2 の対照実験で切り分けた。 */
-  .opt .mark{font-size:18px;line-height:1.3;flex:0 0 auto;opacity:0;
-    min-width:1em;text-align:center}
+     ★下の .opt.correct .mark / .opt.wrong .mark は display:none に負けるので効かない。
+       ○/× を戻したくなったらこの1行を消せば元に戻る（戻し方をここに残しておく）。
+     ★もう1つの原因（縦スクロールバーで幅が15px縮む）は別で、scrollbar-gutter で直してある。
+       2x2 の対照実験で2つが独立であることを確かめた。 */
+  .opt .mark{display:none}
   .opt.correct{border-color:var(--ok);background:var(--ok-soft)}
   .opt.correct .key{border-color:var(--ok);background:var(--ok);color:#fff}
   .opt.correct .mark{opacity:1;color:var(--ok)}
@@ -300,7 +304,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-24 21574c5e</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-25 9c15f5be</span>
   </div>
 </div>
 
