@@ -9,6 +9,9 @@
 //      k !== CACHE で消すと、更新のたびに他の36本のキャッシュを全部 巻き添えで消す。
 const CACHE  = 'javasilver-098d3bb5';
 const PREFIX = 'javasilver-';
+// ★接頭辞だけだと、名前が接頭辞になっている兄弟（javasilver-drill のような追加）まで消す。
+//   末尾が index.html の md5(8桁) であることまで見る（2026-09-25 実測で site 側が実際に踏んだ）
+const STALE  = new RegExp('^' + PREFIX + '[0-9a-f]{8}$');
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,7 +20,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(ks => Promise.all(ks.filter(k => k.startsWith(PREFIX) && k !== CACHE)
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE && STALE.test(k))
                                 .map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
