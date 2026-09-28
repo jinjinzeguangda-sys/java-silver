@@ -45,38 +45,39 @@
   }});
 }})();
 </script>
-<script id="jinji-theme-boot">
-// 明るい/暗いの切り替え。配色は既存のトークンをそのまま使う（1色も足していない）。
+<script id="jinji-theme-boot-v2">
+// 明るさの切り替え（暗い / 中 / 明るい）。配色は既存のトークンだけを使う。
 // 保存が無いときは data-theme を当てない＝OSの設定に従う（従来どおりの見え方）。
 (function(){
-  var KEY='jinji_theme';
+  var KEY='jinji_theme', OK={dark:1,dim:1,light:1}, TC={dark:'#14171C',dim:'#292F3A',light:'#F7F5F1'};
   function saved(){ try{ var t=localStorage.getItem(KEY);
-    return (t==='light'||t==='dark')?t:null; }catch(e){ return null; } }
+    return OK[t]?t:null; }catch(e){ return null; } }
   function osDark(){ try{ return matchMedia('(prefers-color-scheme:dark)').matches; }
     catch(e){ return false; } }
   function current(){ return saved() || (osDark()?'dark':'light'); }
-  // ★描画前に当てる（body より前で走らせているので、切り替え後のちらつきが出ない）
+  // ★描画前に当てる（body より前で走らせているので切り替えのちらつきが出ない）
   var s=saved(); if(s) document.documentElement.setAttribute('data-theme', s);
   function paint(t){
-    var m=document.querySelector('meta[name="theme-color"]');
-    if(m) m.setAttribute('content', t==='dark' ? '#14171C' : '#F7F5F1');
-    var b=document.getElementById('themebtn');
-    if(b){ b.textContent = (t==='dark') ? '明るく' : '暗く';
-           b.title = (t==='dark') ? '明るい表示に切り替える' : '暗い表示に切り替える';
-           b.setAttribute('aria-label', b.title); }
+    if(TC){ var m=document.querySelector('meta[name="theme-color"]');
+      if(m) m.setAttribute('content', TC[t]||TC.dark); }
+    var g=document.getElementById('themeseg'); if(!g) return;
+    var bs=g.querySelectorAll('button');
+    for(var i=0;i<bs.length;i++)
+      bs[i].setAttribute('aria-pressed', bs[i].dataset.themeSet===t ? 'true':'false');
   }
   function init(){
     paint(current());
-    var b=document.getElementById('themebtn');
-    if(b) b.addEventListener('click', function(){
-      var next = (current()==='dark') ? 'light' : 'dark';
-      try{ localStorage.setItem(KEY, next); }catch(e){}
-      document.documentElement.setAttribute('data-theme', next);
-      paint(next);
+    var g=document.getElementById('themeseg'); if(!g) return;
+    g.addEventListener('click', function(e){
+      var b=e.target.closest('button[data-theme-set]'); if(!b) return;
+      var t=b.dataset.themeSet;
+      try{ localStorage.setItem(KEY, t); }catch(err){}
+      document.documentElement.setAttribute('data-theme', t);
+      paint(t);
     });
     // 保存していない人は、OS側が切り替わったら表示も追従させる
     try{ matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){
-      if(!saved()) paint(current()); }); }catch(e){}
+      if(!saved()) paint(current()); }); }catch(err){}
   }
   if(document.readyState==='loading')
     document.addEventListener('DOMContentLoaded', init);
@@ -123,6 +124,10 @@
     --code-bg:#0F1318; --code-ink:#CDD3C6;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   }
+  /* 「中」＝暗いテーマのまま、背景として塗られるトークンだけ明度 +10%。
+     色相・彩度は固定。文字色・アクセント・正誤の色は1ビットも変えていない。
+     上げ幅はこのファイルの実測で決めた（本文 11.1:1 / 補足 4.7:1 / コード 9.2:1 / アクセント 5.4:1） */
+  :root[data-theme="dim"]{ --bg:#292F3A; --surface:#303744; --surface-2:#353E4B; --border:#424B59; --ink:#E7E9EC; --muted:#9AA3AF; --faint:#6B7280; --accent:#E4A24A; --accent-soft:#5C4A2F; --ok:#48B98A; --ok-soft:#285241; --ng:#E5766D; --ng-soft:#54312E; --code-bg:#232C37; --code-ink:#CDD3C6; --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35); }
   *{box-sizing:border-box}
   /* ★回答して解説が出ると縦スクロールが発生し、古典的スクロールバーの環境では
      ビューポートが15px狭くなって選択肢が折り返す（＝回答の前後で位置が動く）。
@@ -151,14 +156,16 @@
   .progress{flex:1;height:7px;background:var(--border);border-radius:99px;overflow:hidden}
   .progress>i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;
     transition:width .35s ease}
-  /* 明るさ切り替えボタン（2026-09-28）。既存トークンだけで組む */
-  .themebtn{appearance:none;-webkit-appearance:none;flex:0 0 auto;
-    padding:5px 11px;border:1px solid var(--border);border-radius:9px;
-    background:var(--surface);color:var(--muted);cursor:pointer;
-    font-family:var(--sans);font-size:12px;line-height:1.2;white-space:nowrap;
-    transition:color .15s ease,border-color .15s ease}
-  .themebtn:hover{color:var(--accent);border-color:var(--accent)}
-  .themebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* 明るさの切り替え 暗い/中/明るい（2026-09-28）。既存トークンだけで組む */
+  .themeseg{display:inline-flex;flex:0 0 auto;border:1px solid var(--border);
+    border-radius:9px;overflow:hidden;background:var(--surface)}
+  .themeseg button{appearance:none;-webkit-appearance:none;border:0;padding:5px 9px;
+    background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans);font-size:12px;line-height:1.2;
+    white-space:nowrap;transition:color .15s ease,background .15s ease}
+  .themeseg button + button{border-left:1px solid var(--border)}
+  .themeseg button:hover{color:var(--accent)}
+  .themeseg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+  .themeseg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .score{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;
     white-space:nowrap}
   .score b{color:var(--ink)}
@@ -345,13 +352,17 @@
     <div class="meta">
       <div class="progress"><i id="pbar"></i></div>
       <div class="score" id="score">0 / 0</div>
-      <button class="themebtn" id="themebtn" type="button" title="明るさを切り替える" aria-label="明るさを切り替える">明るく</button>
+      <div class="themeseg" id="themeseg" role="group" aria-label="画面の明るさ">
+        <button type="button" data-theme-set="dark" title="暗い（いまと同じ）">暗</button>
+        <button type="button" data-theme-set="dim" title="中（画面の明るさを上げた状態）">中</button>
+        <button type="button" data-theme-set="light" title="明るい">明</button>
+      </div>
     </div>
   </div>
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 ecbfb00d</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 3a89dccb</span>
   </div>
 </div>
 
