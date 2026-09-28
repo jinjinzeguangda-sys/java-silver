@@ -45,6 +45,44 @@
   }});
 }})();
 </script>
+<script id="jinji-theme-boot">
+// 明るい/暗いの切り替え。配色は既存のトークンをそのまま使う（1色も足していない）。
+// 保存が無いときは data-theme を当てない＝OSの設定に従う（従来どおりの見え方）。
+(function(){
+  var KEY='jinji_theme';
+  function saved(){ try{ var t=localStorage.getItem(KEY);
+    return (t==='light'||t==='dark')?t:null; }catch(e){ return null; } }
+  function osDark(){ try{ return matchMedia('(prefers-color-scheme:dark)').matches; }
+    catch(e){ return false; } }
+  function current(){ return saved() || (osDark()?'dark':'light'); }
+  // ★描画前に当てる（body より前で走らせているので、切り替え後のちらつきが出ない）
+  var s=saved(); if(s) document.documentElement.setAttribute('data-theme', s);
+  function paint(t){
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', t==='dark' ? '#14171C' : '#F7F5F1');
+    var b=document.getElementById('themebtn');
+    if(b){ b.textContent = (t==='dark') ? '明るく' : '暗く';
+           b.title = (t==='dark') ? '明るい表示に切り替える' : '暗い表示に切り替える';
+           b.setAttribute('aria-label', b.title); }
+  }
+  function init(){
+    paint(current());
+    var b=document.getElementById('themebtn');
+    if(b) b.addEventListener('click', function(){
+      var next = (current()==='dark') ? 'light' : 'dark';
+      try{ localStorage.setItem(KEY, next); }catch(e){}
+      document.documentElement.setAttribute('data-theme', next);
+      paint(next);
+    });
+    // 保存していない人は、OS側が切り替わったら表示も追従させる
+    try{ matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){
+      if(!saved()) paint(current()); }); }catch(e){}
+  }
+  if(document.readyState==='loading')
+    document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
 </head><body>
 <meta charset="utf-8">
 <title>Java Silver 演習コンソール</title>
@@ -113,6 +151,14 @@
   .progress{flex:1;height:7px;background:var(--border);border-radius:99px;overflow:hidden}
   .progress>i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;
     transition:width .35s ease}
+  /* 明るさ切り替えボタン（2026-09-28）。既存トークンだけで組む */
+  .themebtn{appearance:none;-webkit-appearance:none;flex:0 0 auto;
+    padding:5px 11px;border:1px solid var(--border);border-radius:9px;
+    background:var(--surface);color:var(--muted);cursor:pointer;
+    font-family:var(--sans);font-size:12px;line-height:1.2;white-space:nowrap;
+    transition:color .15s ease,border-color .15s ease}
+  .themebtn:hover{color:var(--accent);border-color:var(--accent)}
+  .themebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .score{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;
     white-space:nowrap}
   .score b{color:var(--ink)}
@@ -299,12 +345,13 @@
     <div class="meta">
       <div class="progress"><i id="pbar"></i></div>
       <div class="score" id="score">0 / 0</div>
+      <button class="themebtn" id="themebtn" type="button" title="明るさを切り替える" aria-label="明るさを切り替える">明るく</button>
     </div>
   </div>
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-25 9c15f5be</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 ecbfb00d</span>
   </div>
 </div>
 
