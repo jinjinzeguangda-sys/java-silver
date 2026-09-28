@@ -45,20 +45,21 @@
   }});
 }})();
 </script>
-<script id="jinji-theme-boot-v2">
-// 明るさの切り替え（暗い / 中 / 明るい）。配色は既存のトークンだけを使う。
+<script id="jinji-theme-boot-v3">
+// 明るさの切り替え（暗い / 中 / 明るい）。3段階とも同じ配色で、明るさだけが違う。
 // 保存が無いときは data-theme を当てない＝OSの設定に従う（従来どおりの見え方）。
 (function(){
-  var KEY='jinji_theme', OK={dark:1,dim:1,light:1}, TC={dark:'#14171C',dim:'#292F3A',light:'#F7F5F1'};
+  var KEY='jinji_theme', OK={dark:1,dim:1,bright:1}, TC={dark:'#14171C',dim:'#292F3A',bright:'#3E4858'};
   function saved(){ try{ var t=localStorage.getItem(KEY);
     return OK[t]?t:null; }catch(e){ return null; } }
   function osDark(){ try{ return matchMedia('(prefers-color-scheme:dark)').matches; }
     catch(e){ return false; } }
-  function current(){ return saved() || (osDark()?'dark':'light'); }
+  // OSがライトで未保存のときは null＝どのボタンも押されていない状態にする
+  function current(){ return saved() || (osDark()?'dark':null); }
   // ★描画前に当てる（body より前で走らせているので切り替えのちらつきが出ない）
   var s=saved(); if(s) document.documentElement.setAttribute('data-theme', s);
   function paint(t){
-    if(TC){ var m=document.querySelector('meta[name="theme-color"]');
+    if(TC&&t){ var m=document.querySelector('meta[name="theme-color"]');
       if(m) m.setAttribute('content', TC[t]||TC.dark); }
     var g=document.getElementById('themeseg'); if(!g) return;
     var bs=g.querySelectorAll('button');
@@ -124,10 +125,14 @@
     --code-bg:#0F1318; --code-ink:#CDD3C6;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   }
-  /* 「中」＝暗いテーマのまま、背景として塗られるトークンだけ明度 +10%。
-     色相・彩度は固定。文字色・アクセント・正誤の色は1ビットも変えていない。
-     上げ幅はこのファイルの実測で決めた（本文 11.1:1 / 補足 4.7:1 / コード 9.2:1 / アクセント 5.4:1） */
-  :root[data-theme="dim"]{ --bg:#292F3A; --surface:#303744; --surface-2:#353E4B; --border:#424B59; --ink:#E7E9EC; --muted:#9AA3AF; --faint:#6B7280; --accent:#E4A24A; --accent-soft:#5C4A2F; --ok:#48B98A; --ok-soft:#285241; --ng:#E5766D; --ng-soft:#54312E; --code-bg:#232C37; --code-ink:#CDD3C6; --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35); }
+  /* 「中（すこし明るい）」＝暗いテーマのまま、背景として塗られる 8色の明度を +10%。
+     色相・彩度は固定／前景は 薄字 +6% だけ補正。
+     コントラスト比の実測: 本文 11.1:1 / 補足 4.7:1 / コード 9.2:1 / アクセント 5.4:1 / 正解 4.9:1 / 不正解 4.1:1 / 薄字 3.1:1 */
+  :root[data-theme="dim"]{ --bg:#292F3A; --surface:#303744; --surface-2:#353E4B; --border:#424B59; --ink:#E7E9EC; --muted:#9AA3AF; --faint:#7A8190; --accent:#E4A24A; --accent-soft:#5C4A2F; --ok:#48B98A; --ok-soft:#285241; --ng:#E5766D; --ng-soft:#54312E; --code-bg:#232C37; --code-ink:#CDD3C6; --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35); }
+  /* 「明るい」＝暗いテーマのまま、背景として塗られる 8色の明度を +20%。
+     色相・彩度は固定／前景は 補足 +12%・不正解 +3%・薄字 +17% だけ補正。
+     コントラスト比の実測: 本文 7.6:1 / 補足 4.5:1 / コード 6.4:1 / アクセント 3.7:1 / 正解 3.3:1 / 不正解 3.1:1 / 薄字 3.0:1 */
+  :root[data-theme="bright"]{ --bg:#3E4858; --surface:#455062; --surface-2:#4A5669; --border:#576377; --ink:#E7E9EC; --muted:#BCC2CA; --faint:#989EA9; --accent:#E4A24A; --accent-soft:#7D6541; --ok:#48B98A; --ok-soft:#38755D; --ng:#E7827A; --ng-soft:#754540; --code-bg:#364557; --code-ink:#CDD3C6; --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35); }
   *{box-sizing:border-box}
   /* ★回答して解説が出ると縦スクロールが発生し、古典的スクロールバーの環境では
      ビューポートが15px狭くなって選択肢が折り返す（＝回答の前後で位置が動く）。
@@ -354,15 +359,15 @@
       <div class="score" id="score">0 / 0</div>
       <div class="themeseg" id="themeseg" role="group" aria-label="画面の明るさ">
         <button type="button" data-theme-set="dark" title="暗い（いまと同じ）">暗</button>
-        <button type="button" data-theme-set="dim" title="中（画面の明るさを上げた状態）">中</button>
-        <button type="button" data-theme-set="light" title="明るい">明</button>
+        <button type="button" data-theme-set="dim" title="中（すこし明るい）">中</button>
+        <button type="button" data-theme-set="bright" title="明るい">明</button>
       </div>
     </div>
   </div>
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 3a89dccb</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 ef94b2ea</span>
   </div>
 </div>
 
