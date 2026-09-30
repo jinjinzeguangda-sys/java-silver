@@ -85,6 +85,37 @@
   else init();
 })();
 </script>
+<script id="jinji-ink-boot-v1">
+// 文字の明るさ（標準 / 明るく）。背景の 暗/中/明 とは独立した軸。
+// 既定は「標準」＝いままでと1ピクセルも変わらない。
+(function(){
+  var K='jinji_ink';
+  function on(){ try{ return localStorage.getItem(K)==='bright'; }catch(e){ return false; } }
+  // ★描画前に当てる（body より前で走らせているのでちらつかない）
+  if(on()) document.documentElement.setAttribute('data-ink','bright');
+  function paint(){
+    var g=document.getElementById('inkseg'); if(!g) return;
+    var b=on(), bs=g.querySelectorAll('button');
+    for(var i=0;i<bs.length;i++)
+      bs[i].setAttribute('aria-pressed',
+        ((bs[i].getAttribute('data-ink-set')==='bright')===b)?'true':'false');
+  }
+  function init(){
+    paint();
+    var g=document.getElementById('inkseg'); if(!g) return;
+    g.addEventListener('click', function(e){
+      var b=e.target.closest ? e.target.closest('button[data-ink-set]') : null; if(!b) return;
+      var v=b.getAttribute('data-ink-set');
+      try{ localStorage.setItem(K, v); }catch(err){}
+      if(v==='bright') document.documentElement.setAttribute('data-ink','bright');
+      else document.documentElement.removeAttribute('data-ink');
+      paint();
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
 </head><body>
 <meta charset="utf-8">
 <title>Java Silver 演習コンソール</title>
@@ -356,18 +387,13 @@
     </div>
     <div class="meta">
       <div class="progress"><i id="pbar"></i></div>
-      <div class="score" id="score">0 / 0</div>
-      <div class="themeseg" id="themeseg" role="group" aria-label="画面の明るさ">
-        <button type="button" data-theme-set="dark" title="暗い（いまと同じ）">暗</button>
-        <button type="button" data-theme-set="dim" title="中（すこし明るい）">中</button>
-        <button type="button" data-theme-set="bright" title="明るい">明</button>
-      </div>
+      <div class="score" id="score">0 / 0</div><div class="themeseg" id="inkseg" role="group" aria-label="文字の明るさ"><button type="button" data-ink-set="normal" title="文字はいまのまま">標準</button><button type="button" data-ink-set="bright" title="文字を明るくする">明るく</button></div>
     </div>
   </div>
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-28 ef94b2ea</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-09-30 f429bb40</span>
   </div>
 </div>
 
@@ -2673,6 +2699,18 @@ renderQuestion();
     .meta{flex:1 1 auto;margin-top:0}
     .footer{margin-top:8px;flex:0 0 auto}
   }
+</style>
+<style id="jinji-ink-v1">/* 文字の明るさ（標準/明るく）案D
+   ★特異度(0,3,0)で基本(0,2,0)に勝たせ、かつ すべてのスタイル定義より後ろに置く。
+     前に置くと「同じ強さなら後勝ち」で基本CSSに打ち消される（2026-09-30 実測）
+   ★ライト側は @media (prefers-color-scheme:light) で包む。包まないと
+     (0,3,0) が @media 内の (0,2,0) に勝ち、ダークOSで黒い文字が出る */
+@media (prefers-color-scheme:light){:root:not([data-theme])[data-ink="bright"]{--ink:#0B0E13;--muted:#29303E;--faint:#4A535F;--code-ink:#0B0F06;}}
+@media (prefers-color-scheme:dark){:root:not([data-theme])[data-ink="bright"]{--ink:#FFFFFF;--muted:#DCE5F1;--faint:#BBC2D0;--code-ink:#F5FBEE;}}
+:root[data-theme="light"][data-ink="bright"]{--ink:#0B0E13;--muted:#29303E;--faint:#4A535F;--code-ink:#0B0F06;}
+:root[data-theme="dark"][data-ink="bright"]{--ink:#FFFFFF;--muted:#DCE5F1;--faint:#BBC2D0;--code-ink:#F5FBEE;}
+:root[data-theme="dim"][data-ink="bright"]{--ink:#FFFFFF;--muted:#DCE5F1;--faint:#CAD1E0;--code-ink:#F5FBEE;}
+:root[data-theme="bright"][data-ink="bright"]{--ink:#FFFFFF;--muted:#FEFFFF;--faint:#E8EEF9;--code-ink:#F5FBEE;}
 </style>
 <script>
 (function(){
