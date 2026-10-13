@@ -393,7 +393,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 fc174d8d</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 d78c7008</span>
   </div>
 </div>
 
@@ -3060,17 +3060,59 @@ renderQuestion();
   }
   function textLen(el){ if (!el) return 400; return ((el.innerText || el.textContent || '')).replace(/\s+/g,'').length; }
 
+  /* ---------- 画面に収まらないぶんを自動で送る（2026-10-13 実測で追加） ---------- */
+  // ★なぜ要るか（実測: headless Chrome を iPad の寸法にして java-silver 全80問を測った）
+  //     iPad 11" 縦 820x1180 … 解答の見出しが画面の外 15問(18.8%) / 解説の末尾が外 22問(27.5%)
+  //     iPad 9.7  縦 768x1024 … 20問(25.0%) / 41問(51.2%)
+  //     iPad 11" 横 1180x820 …  4問( 5.0%) /  9問(11.3%)
+  //   皿洗いしながらでは指で送れない＝送らないと「解答は出たのに読めない」で終わる。
+  // ★解答が出た時は「見出しを画面の上端へ送る」だけで足りる。上の3サイズ80問すべてで、
+  //   送ったあと解説の末尾まで1画面に収まることを実測した（はみ出し 0問）。
+  //   下の「残りを何回かに分けて送る」は、それより縦が短い画面のための保険。
+  // ★送り終えたあとに読む時間を残す（表示時間の3割）。全部使い切ると読む前に次へ行く。
+  var scrollTimers = [];
+  function clearScrolls(){ for (var i = 0; i < scrollTimers.length; i++) clearTimeout(scrollTimers[i]); scrollTimers = []; }
+  function maxScrollY(){ return Math.max(0, document.documentElement.scrollHeight - innerHeight); }
+  function scrollToY(y){
+    var soft = true;
+    try { soft = !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+    try { window.scrollTo({ top: y, behavior: soft ? 'smooth' : 'auto' }); } catch(e) { window.scrollTo(0, y); }
+  }
+  function planScroll(ms){
+    clearScrolls();
+    if (!st.on || paused || document.hidden) return 0;
+    var base = pageYOffset;
+    var av = document.querySelector('.autoverdict');
+    if (av) {                                      // 解答が出た＝まず見出しを画面の上端へ
+      var y = Math.min(maxScrollY(), base + av.getBoundingClientRect().top - 12);
+      if (y > base + 4) { scrollToY(y); base = y; }
+    }
+    var over = maxScrollY() - base;
+    if (over <= 8) return 0;                       // 収まっている＝送らない
+    var step = Math.max(160, innerHeight - 90);    // 90px 重ねて読み継ぐ
+    var n = Math.ceil(over / step);
+    var span = ms * 0.7;
+    for (var k = 1; k <= n; k++) {
+      scrollTimers.push(setTimeout(function(){
+        if (!st.on || paused || document.hidden) return;
+        scrollToY(Math.min(maxScrollY(), pageYOffset + step));
+      }, Math.round(span * k / (n + 1))));
+    }
+    return n;
+  }
+
   /* ---------- タイマー ---------- */
   var timer = null, pending = null, deadline = 0, remain = 0;
   var paused = false, passes = 0, startedAt = 0, rafId = null;
 
-  function clearTimer(){ if (timer) { clearTimeout(timer); timer = null; } }
+  function clearTimer(){ if (timer) { clearTimeout(timer); timer = null; } clearScrolls(); }
   function stopRaf(){ if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
 
   function schedule(ms, fn){
     clearTimer(); pending = fn; deadline = Date.now() + ms;
     timer = setTimeout(function(){ timer = null; var f = pending; pending = null; if (f) f(); }, ms);
     animateBar(ms);
+    planScroll(ms);
   }
   function animateBar(ms){
     barI.style.transition = 'none'; barI.style.transform = 'scaleX(1)';
@@ -3182,6 +3224,7 @@ renderQuestion();
     if (!st.on || paused) return;
     if (screenOpen()) return;                 // 問題選択画面が開いている間は進めない
     if (document.hidden) return;
+    try { window.scrollTo(0, 0); } catch(e){}   // 新しい問題は必ず最上部から（送る量を決める基準にもなる）
     schedule(msFor(textLen(document.querySelector('.qcard')), 3200, 5000, 40000), function(){
       autoReveal();
       schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 27000), function(){
@@ -3272,7 +3315,8 @@ renderQuestion();
                                 hasLock: !!lock, passes: passes }; },
     start: start, stop: stop, toggle: toggle, pause: pause, resume: resume,
     setSpeed: function(k){ st.speed = k; persist(); paintUI(); },
-    fire: function(){ if (!timer || !pending) return false; var f = pending; clearTimer(); pending = null; f(); return true; }
+    fire: function(){ if (!timer || !pending) return false; var f = pending; clearTimer(); pending = null; f(); return true; },
+    scrollPlan: function(){ return scrollTimers.length; }
   };
 })();
 </script>
