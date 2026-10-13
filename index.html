@@ -3031,6 +3031,14 @@ renderQuestion();
   // ★この 45ms は読む速さの「目安」で、実測した値ではない。
   //   70ms で測ったら「はやい」でも1問 15.4秒かかって明らかに遅かったので 45 にした。
   //   合うかどうかは iPad で本人が確かめて、速さボタンで調整する前提。
+  // ★2026-10-13 上限を 18000→40000(問題) / 20000→27000(解説) に上げた。実測が理由:
+  //   全37アプリ1,315問を数えると、問題側は旧上限18秒に **124問(9%)** が張り付いていた。
+  //   java系はもっとひどく java-silver 27/80(34%)・final2 35/77(45%)・java-bronze 20/60(33%)。
+  //   張り付くと「文字量に応じて待つ」が効かず、**329字も794字も同じ18秒**になる
+  //   （最長794字＝38字/秒で、皿洗いしながら読める速さではない）。
+  //   ★倍率 mul() は clamp の**後**に掛かるので、「ゆっくり」で逃げると短い問題まで間延びする。
+  //   直すべきは上限の側。新しい値は式が全問を覆う最小値（794字→38,930ms / 解説517字→26,065ms）。
+  //   下げたぶんは1問も無い＝短い問題の待ち時間は1ミリも変わっていない。
   function msFor(chars, base, lo, hi){
     var raw = base + chars * 45;
     return Math.round(Math.min(hi, Math.max(lo, raw)) * mul());
@@ -3156,9 +3164,9 @@ renderQuestion();
     if (!st.on || paused) return;
     if (screenOpen()) return;                 // 問題選択画面が開いている間は進めない
     if (document.hidden) return;
-    schedule(msFor(textLen(document.querySelector('.qcard')), 3200, 5000, 18000), function(){
+    schedule(msFor(textLen(document.querySelector('.qcard')), 3200, 5000, 40000), function(){
       autoReveal();
-      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 20000), function(){
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 27000), function(){
         if (pos >= queue.length - 1) { onePassDone(); }
         else if (typeof next === 'function') next();
       });
@@ -3180,7 +3188,7 @@ renderQuestion();
     persist(); paintUI(); wakeOn();
     // いまの問題がもう答え済みなら次から、まだなら この問題から
     if (typeof answered !== 'undefined' && answered) {
-      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 20000), function(){
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 27000), function(){
         if (pos >= queue.length - 1) onePassDone(); else next();
       });
     } else {
