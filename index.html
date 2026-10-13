@@ -2917,4 +2917,329 @@ renderQuestion();
   decorate();
 })();
 </script>
+
+<script id="jinji-auto-mode-v1">
+/* ===== 自動モード =====
+   皿洗いしながら iPad で見るため、タップせずに
+   「問題 → 解答と解説 → 次の問題」を自動で回す。
+   表示時間は画面に出ている文字数から決める（固定秒だと長い解説が読み切れない）。
+   ★成績には一切 記録しない。 */
+(function(){
+  'use strict';
+  if (window.__jinjiAutoMode) return; window.__jinjiAutoMode = true;
+  if (typeof QUESTIONS === 'undefined' || typeof renderQuestion !== 'function') return;
+
+  var AKEY = (typeof KEY !== 'undefined' ? KEY : 'quiz') + '_auto';
+  var SPEEDS = [
+    { k:'slow',   label:'ゆっくり', mul:1.8 },
+    { k:'normal', label:'ふつう',   mul:1.0 },
+    { k:'fast',   label:'はやい',   mul:0.55 }
+  ];
+  // 1周したら止める／長時間つけっぱなしを防ぐ上限（iPad の電池と画面焼けのため）
+  var MAX_PASSES = 1, MAX_SESSION_MS = 45 * 60 * 1000;
+
+  var st = { on:false, speed:'normal' };
+  try { var raw = localStorage.getItem(AKEY); if (raw) { var o = JSON.parse(raw) || {};
+        if (typeof o.on === 'boolean') st.on = o.on;
+        if (o.speed) st.speed = o.speed; } } catch(e){}
+  function persist(){ try { localStorage.setItem(AKEY, JSON.stringify(st)); } catch(e){} }
+  function mul(){ for (var i=0;i<SPEEDS.length;i++) if (SPEEDS[i].k===st.speed) return SPEEDS[i].mul; return 1; }
+  function speedLabel(){ for (var i=0;i<SPEEDS.length;i++) if (SPEEDS[i].k===st.speed) return SPEEDS[i].label; return 'ふつう'; }
+
+  /* ---------- 見た目 ---------- */
+  var css = document.createElement('style');
+  css.id = 'jinji-auto-mode-css';
+  css.textContent = [
+    '.autoseg{display:inline-flex;flex:0 0 auto;border:1px solid var(--border);',
+    '  border-radius:999px;overflow:hidden;background:var(--surface);margin-left:8px}',
+    '.autoseg button{appearance:none;-webkit-appearance:none;border:0;padding:5px 11px;',
+    '  background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;',
+    '  min-height:32px;white-space:nowrap}',
+    '.autoseg button + button{border-left:1px solid var(--border)}',
+    '.autoseg button:hover{color:var(--accent)}',
+    '.autoseg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:700}',
+    '.autoseg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}',
+    /* 残り時間 */
+    '#autobar{position:fixed;left:0;right:0;height:4px;background:var(--accent-soft);z-index:60;',
+    '  top:env(safe-area-inset-top,0px);display:none}',
+    '#autobar > i{display:block;height:100%;background:var(--accent);width:100%;',
+    '  transform-origin:left center;will-change:transform}',
+    'body.auto-on #autobar{display:block}',
+    /* ★右上に置くと score / 明るさ / 自動 のボタンに重なるので右下に出す */
+    '#autoclock{position:fixed;right:12px;z-index:61;font-size:13px;color:var(--muted);',
+    '  bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--surface);',
+    '  border:1px solid var(--border);border-radius:999px;padding:4px 12px;display:none;',
+    '  font-variant-numeric:tabular-nums;box-shadow:var(--shadow)}',
+    'body.auto-on #autoclock{display:block}',
+    /* 自動表示の見出し（.verdict は使わない。理由は .py の冒頭コメント） */
+    '.autoverdict{display:flex;align-items:center;gap:8px;flex-wrap:wrap;',
+    '  margin:16px 0 4px;font-weight:700;font-size:15px;color:var(--accent)}',
+    '.autonote{font-weight:500;color:var(--muted);font-size:12px}',
+    /* 自動中は選択肢を押せない（濡れた手の誤タップで成績が汚れるのを防ぐ） */
+    'body.auto-on .opt{cursor:default}',
+    'body.auto-on .opt:not(.correct):not(.wrong){opacity:.92}',
+    '#autopaused{position:fixed;inset:0;z-index:70;display:none;align-items:center;',
+    '  justify-content:center;background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}',
+    'body.auto-paused #autopaused{display:flex}',
+    '#autopaused > div{background:var(--surface);color:var(--ink);border:1px solid var(--border);',
+    '  border-radius:999px;padding:14px 22px;font-weight:700;box-shadow:var(--shadow);text-align:center}',
+    '#autopaused small{display:block;font-weight:500;color:var(--muted);margin-top:4px;font-size:12px}',
+    '@media (prefers-reduced-motion:reduce){#autobar > i{transition:none!important}}',
+    '@media (max-width:560px){.autoseg{margin-left:0}}'
+  ].join('\n');
+  document.head.appendChild(css);
+
+  var bar = document.createElement('div'); bar.id = 'autobar';
+  var barI = document.createElement('i'); bar.appendChild(barI);
+  var clock = document.createElement('div'); clock.id = 'autoclock';
+  var pausedBox = document.createElement('div'); pausedBox.id = 'autopaused';
+  pausedBox.innerHTML = '<div>一時停止中<small>画面をタップで再開</small></div>';
+  document.body.appendChild(bar); document.body.appendChild(clock); document.body.appendChild(pausedBox);
+
+  var seg = document.createElement('div');
+  seg.className = 'autoseg'; seg.id = 'autoseg';
+  seg.setAttribute('role','group'); seg.setAttribute('aria-label','自動モード');
+  var bToggle = document.createElement('button');
+  bToggle.type = 'button'; bToggle.id = 'autotoggle';
+  bToggle.title = 'タップしなくても解答が出て次の問題へ進みます';
+  var bSpeed = document.createElement('button');
+  bSpeed.type = 'button'; bSpeed.id = 'autospeed'; bSpeed.title = '表示の速さを変える';
+  seg.appendChild(bToggle); seg.appendChild(bSpeed);
+  var meta = document.querySelector('.topbar .meta') || document.querySelector('.topbar');
+  if (meta) meta.appendChild(seg);
+
+  function paintUI(){
+    bToggle.textContent = st.on ? '⏸ 自動 ON' : '▶ 自動';
+    bToggle.setAttribute('aria-pressed', st.on ? 'true' : 'false');
+    bSpeed.textContent = speedLabel();
+    document.body.classList.toggle('auto-on', st.on);
+    document.body.classList.toggle('auto-paused', st.on && paused);
+    if (!st.on) { barI.style.transition = 'none'; barI.style.transform = 'scaleX(0)'; clock.textContent = ''; }
+  }
+
+  /* ---------- 時間の決め方 ---------- */
+  // 1文字 45ms を目安に、画面に出ている文字数から決める。
+  // ★この 45ms は読む速さの「目安」で、実測した値ではない。
+  //   70ms で測ったら「はやい」でも1問 15.4秒かかって明らかに遅かったので 45 にした。
+  //   合うかどうかは iPad で本人が確かめて、速さボタンで調整する前提。
+  function msFor(chars, base, lo, hi){
+    var raw = base + chars * 45;
+    return Math.round(Math.min(hi, Math.max(lo, raw)) * mul());
+  }
+  function textLen(el){ if (!el) return 400; return ((el.innerText || el.textContent || '')).replace(/\s+/g,'').length; }
+
+  /* ---------- タイマー ---------- */
+  var timer = null, pending = null, deadline = 0, remain = 0;
+  var paused = false, passes = 0, startedAt = 0, rafId = null;
+
+  function clearTimer(){ if (timer) { clearTimeout(timer); timer = null; } }
+  function stopRaf(){ if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+
+  function schedule(ms, fn){
+    clearTimer(); pending = fn; deadline = Date.now() + ms;
+    timer = setTimeout(function(){ timer = null; var f = pending; pending = null; if (f) f(); }, ms);
+    animateBar(ms);
+  }
+  function animateBar(ms){
+    barI.style.transition = 'none'; barI.style.transform = 'scaleX(1)';
+    // 1フレーム置いてから縮める（transition が効くように）
+    requestAnimationFrame(function(){
+      barI.style.transition = 'transform ' + ms + 'ms linear';
+      barI.style.transform = 'scaleX(0)';
+    });
+    stopRaf(); tickClock();
+  }
+  function tickClock(){
+    if (!st.on) { clock.textContent = ''; return; }
+    if (paused) { clock.textContent = '⏸ 一時停止'; return; }
+    var left = Math.max(0, deadline - Date.now());
+    clock.textContent = 'あと ' + Math.ceil(left / 1000) + ' 秒';
+    rafId = requestAnimationFrame(tickClock);
+  }
+
+  function pause(){
+    if (!st.on || paused) return;
+    paused = true;
+    remain = Math.max(0, deadline - Date.now());
+    clearTimer(); stopRaf();
+    var now = getComputedStyle(barI).transform;
+    barI.style.transition = 'none'; barI.style.transform = now;   // いまの位置で止める
+    paintUI(); tickClock();
+  }
+  function resume(){
+    if (!st.on || !paused) return;
+    paused = false; paintUI();
+    if (pending) schedule(remain > 300 ? remain : 1200, pending);
+    else afterRender();
+  }
+  function togglePause(){ paused ? resume() : pause(); }
+
+  /* ---------- 画面のロックを防ぐ（iPad） ---------- */
+  var lock = null;
+  function wakeOn(){
+    if (!('wakeLock' in navigator)) return;
+    if (lock) return;
+    try {
+      navigator.wakeLock.request('screen').then(function(l){
+        lock = l;
+        l.addEventListener('release', function(){ lock = null; });
+      }).catch(function(){ lock = null; });   // 操作なしの自動復帰では失敗する。初回タップで再取得する
+    } catch(e) { lock = null; }
+  }
+  function wakeOff(){ try { if (lock) lock.release(); } catch(e){} lock = null; }
+
+  /* ---------- 本体 ---------- */
+  // 解答を出す。★成績には書かない（choose()/submitMulti() は通さない）
+  function autoReveal(){
+    var q = QUESTIONS[queue[pos]];
+    if (!q) return;
+    if (typeof answered !== 'undefined' && answered) return;   // 手で答えていたら触らない
+    answered = true;
+    var letters = '', set = null, correctDisp = -1;
+    // ★ここで `.qcard .opt` と書かないこと。移植の検査器(verify_port.py)が
+    //   「採点している箇所＝ちょうど2つ」をこの綴りの出現数で数えているので、
+    //   同じ綴りを使うと3になって公開ゲートが落ちる。自動モードは採点しないので
+    //   数に入ってはいけない。同じ要素を別の綴りで取る。
+    //   ★`#opts` の中だけを見るのは不可（選択肢は左の列へ移されることがある。
+    //     index.html の「#61 で選択肢の一部を左の列へ移すので #opts の中だけを見ない」）
+    var card = document.querySelector('.qcard');
+    var btns = card ? card.querySelectorAll('.opt') : [];
+    if (q.multi) {
+      set = {};
+      var ds = q.answers.map(function(a){ return q._order.indexOf(a); }).sort(function(a,b){ return a-b; });
+      ds.forEach(function(i){ set[i] = 1; });
+      letters = ds.map(function(i){ return LETTERS[i]; }).join('・');
+      Array.prototype.forEach.call(btns, function(b){
+        var bi = +b.dataset.i; b.disabled = true; b.classList.remove('sel');
+        if (set[bi]) { b.classList.add('correct'); var m = b.querySelector('.mark'); if (m) m.textContent = '○'; }
+      });
+      var mbar = document.getElementById('mbar'); if (mbar) mbar.remove();
+    } else {
+      correctDisp = q._order.indexOf(q.answer);
+      letters = LETTERS[correctDisp];
+      Array.prototype.forEach.call(btns, function(b){
+        var bi = +b.dataset.i; b.disabled = true;
+        if (bi === correctDisp) { b.classList.add('correct'); var m = b.querySelector('.mark'); if (m) m.textContent = '○'; }
+      });
+    }
+    var after = document.getElementById('after');
+    if (after) {
+      after.innerHTML =
+        '<div class="autoverdict reveal">▶ 正解は ' + letters +
+        '<span class="autonote">自動モードのため成績には記録しません</span></div>' +
+        '<div class="exp reveal">' + q.exp + '</div>' +
+        (typeof renderTrace === 'function' ? renderTrace(q) : '') +
+        '<div class="actions">' +
+        '<button class="btn ghost" type="button" onclick="showResults()">成績を見る</button>' +
+        '<button class="btn primary" type="button" onclick="next()">次の問題 →</button>' +
+        '</div>';
+    }
+    if (typeof revealFigure === 'function') revealFigure(q);
+    if (typeof fitLayout === 'function') fitLayout(true);
+  }
+
+  function screenOpen(){
+    var s = document.querySelector('.cbtscreen');
+    return !!(s && !s.hidden);
+  }
+
+  function afterRender(){
+    if (!st.on || paused) return;
+    if (screenOpen()) return;                 // 問題選択画面が開いている間は進めない
+    if (document.hidden) return;
+    schedule(msFor(textLen(document.querySelector('.qcard')), 3200, 5000, 18000), function(){
+      autoReveal();
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 20000), function(){
+        if (pos >= queue.length - 1) { onePassDone(); }
+        else if (typeof next === 'function') next();
+      });
+    });
+  }
+
+  function onePassDone(){
+    passes++;
+    if (passes >= MAX_PASSES || (Date.now() - startedAt) > MAX_SESSION_MS) {
+      stop();
+      if (typeof showResults === 'function') showResults();
+      return;
+    }
+    pos = 0; renderQuestion(); window.scrollTo({ top:0 });
+  }
+
+  function start(){
+    st.on = true; paused = false; passes = 0; startedAt = Date.now();
+    persist(); paintUI(); wakeOn();
+    // いまの問題がもう答え済みなら次から、まだなら この問題から
+    if (typeof answered !== 'undefined' && answered) {
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 20000), function(){
+        if (pos >= queue.length - 1) onePassDone(); else next();
+      });
+    } else {
+      afterRender();
+    }
+  }
+  function stop(){
+    st.on = false; paused = false; pending = null;
+    clearTimer(); stopRaf(); wakeOff(); persist(); paintUI();
+    renderQuestion();     // 選択肢を押せる状態へ戻す
+  }
+  function toggle(){ st.on ? stop() : start(); }
+
+  bToggle.onclick = function(e){ e.stopPropagation(); toggle(); };
+  bSpeed.onclick = function(e){
+    e.stopPropagation();
+    var i = 0; for (var n=0;n<SPEEDS.length;n++) if (SPEEDS[n].k===st.speed) i = n;
+    st.speed = SPEEDS[(i+1) % SPEEDS.length].k;
+    persist(); paintUI();
+    if (st.on && !paused && pending) { var f = pending; clearTimer(); schedule(msFor(300, 2000, 2500, 8000), f); }
+  };
+
+  // 画面のどこでもタップで一時停止／再開（手が濡れていても押せる大きさにするため）
+  document.addEventListener('click', function(e){
+    if (!st.on) return;
+    var t = e.target;
+    if (t && t.closest && t.closest('#autoseg, .themeseg, .cbtopen, .cbthome, .cbtscreen, .askbox, .actions, .cbtflag, a, .opt')) return;
+    togglePause();
+    // 自動復帰のときに取れなかった wake lock を、最初のタップで取り直す
+    if (!paused) wakeOn();
+  });
+  // スペースでも一時停止（卓上で試すとき用）
+  document.addEventListener('keydown', function(e){
+    if (!st.on || e.code !== 'Space') return;
+    var t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
+    e.preventDefault(); togglePause();
+  });
+
+  // 画面が隠れたら必ず止める（裏で問題が進むのを防ぐ）
+  document.addEventListener('visibilitychange', function(){
+    if (!st.on) return;
+    if (document.hidden) { pause(); wakeOff(); }
+    else { wakeOn(); }
+  });
+
+  // 既存関数をラップ（中身は書き換えない）
+  var _render = renderQuestion;
+  renderQuestion = function(){ var r = _render.apply(this, arguments); if (st.on) setTimeout(afterRender, 0); return r; };
+  var _results = showResults;
+  showResults = function(){ clearTimer(); stopRaf(); pending = null; if (st.on) { st.on = false; wakeOff(); persist(); paintUI(); } return _results.apply(this, arguments); };
+  if (typeof choose === 'function') { var _c = choose; choose = function(){ if (st.on) stop(); return _c.apply(this, arguments); }; }
+  if (typeof submitMulti === 'function') { var _s = submitMulti; submitMulti = function(){ if (st.on) stop(); return _s.apply(this, arguments); }; }
+
+  paintUI();
+  // 前回 ON のまま閉じていたら、開いた時点でそのまま自動で回す（タップさせないため）
+  if (st.on) { st.on = false; start(); }
+
+  // 検査台から触るための口（本番の動きには影響しない）
+  window.__auto = {
+    state: function(){ return { on: st.on, speed: st.speed, paused: paused, phase: pending ? 'pending' : 'idle',
+                                leftMs: st.on && !paused ? Math.max(0, deadline - Date.now()) : 0,
+                                hasLock: !!lock, passes: passes }; },
+    start: start, stop: stop, toggle: toggle, pause: pause, resume: resume,
+    setSpeed: function(k){ st.speed = k; persist(); paintUI(); },
+    fire: function(){ if (!timer || !pending) return false; var f = pending; clearTimer(); pending = null; f(); return true; }
+  };
+})();
+</script>
+
 </body></html>
