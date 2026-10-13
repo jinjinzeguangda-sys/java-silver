@@ -393,7 +393,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 287823a5</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 fc174d8d</span>
   </div>
 </div>
 
@@ -2971,6 +2971,15 @@ renderQuestion();
     '  border:1px solid var(--border);border-radius:999px;padding:4px 12px;display:none;',
     '  font-variant-numeric:tabular-nums;box-shadow:var(--shadow)}',
     'body.auto-on #autoclock{display:block}',
+    /* ★この端末では画面ロックを防げない、と知らせる。黙って画面が消えると
+       「自動モードが壊れている」と読まれて原因に辿り着けない（2026-10-13 追加）。
+       右下は #autoclock が使っているので左下に出す */
+    '#autonolock{position:fixed;left:12px;z-index:61;font-size:12px;line-height:1.5;',
+    '  bottom:calc(env(safe-area-inset-bottom,0px) + 12px);max-width:min(62vw,420px);',
+    '  background:var(--surface);color:var(--ink);border:1px solid var(--border);',
+    '  border-radius:12px;padding:8px 12px;display:none;box-shadow:var(--shadow)}',
+    '#autonolock b{color:var(--accent);font-size:12px}',
+    'body.auto-on.auto-nolock #autonolock{display:block}',
     /* 自動表示の見出し（.verdict は使わない。理由は .py の冒頭コメント） */
     '.autoverdict{display:flex;align-items:center;gap:8px;flex-wrap:wrap;',
     '  margin:16px 0 4px;font-weight:700;font-size:15px;color:var(--accent)}',
@@ -3003,7 +3012,12 @@ renderQuestion();
   var clock = document.createElement('div'); clock.id = 'autoclock';
   var pausedBox = document.createElement('div'); pausedBox.id = 'autopaused';
   pausedBox.innerHTML = '<div>一時停止中<small>画面をタップで再開</small></div>';
+  var noLockBox = document.createElement('div'); noLockBox.id = 'autonolock';
+  noLockBox.innerHTML = '<b>\u26a0 \u753b\u9762\u304c\u6d88\u3048\u308b\u306e\u3092\u9632\u3052\u307e\u305b\u3093</b><br>'
+    + '\u3053\u306e\u7aef\u672b\u3084\u63a5\u7d9a\u3067\u306f\u81ea\u52d5\u30ed\u30c3\u30af\u3092\u6b62\u3081\u3089\u308c\u307e\u305b\u3093\u3002'
+    + '\u8a2d\u5b9a \u25b8 \u753b\u9762\u8868\u793a\u3068\u660e\u308b\u3055 \u25b8 \u81ea\u52d5\u30ed\u30c3\u30af \u3092\u300c\u306a\u3057\u300d\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002';
   document.body.appendChild(bar); document.body.appendChild(clock); document.body.appendChild(pausedBox);
+  document.body.appendChild(noLockBox);
 
   var seg = document.createElement('div');
   seg.className = 'autoseg'; seg.id = 'autoseg';
@@ -3023,6 +3037,7 @@ renderQuestion();
     bSpeed.textContent = speedLabel();
     document.body.classList.toggle('auto-on', st.on);
     document.body.classList.toggle('auto-paused', st.on && paused);
+    document.body.classList.toggle('auto-nolock', st.on && noLock);
     if (!st.on) { barI.style.transition = 'none'; barI.style.transform = 'scaleX(0)'; clock.textContent = ''; }
   }
 
@@ -3092,13 +3107,16 @@ renderQuestion();
   function togglePause(){ paused ? resume() : pause(); }
 
   /* ---------- 画面のロックを防ぐ（iPad） ---------- */
-  var lock = null;
+  var lock = null, noLock = false;
   function wakeOn(){
-    if (!('wakeLock' in navigator)) return;
+    // ★API そのものが無い時だけ知らせる（iOS 16.4 未満／https でない接続）。
+    //   非同期の reject は「操作なしの自動復帰で失敗した」だけのことがあり、
+    //   次のタップや復帰で取り直せるので、それで警告を出すと誤報になる。
+    if (!('wakeLock' in navigator)) { noLock = true; try { paintUI(); } catch(e){} return; }
     if (lock) return;
     try {
       navigator.wakeLock.request('screen').then(function(l){
-        lock = l;
+        lock = l; noLock = false; try { paintUI(); } catch(e){}
         l.addEventListener('release', function(){ lock = null; });
       }).catch(function(){ lock = null; });   // 操作なしの自動復帰では失敗する。初回タップで再取得する
     } catch(e) { lock = null; }
