@@ -2985,7 +2985,16 @@ renderQuestion();
     '  border-radius:999px;padding:14px 22px;font-weight:700;box-shadow:var(--shadow);text-align:center}',
     '#autopaused small{display:block;font-weight:500;color:var(--muted);margin-top:4px;font-size:12px}',
     '@media (prefers-reduced-motion:reduce){#autobar > i{transition:none!important}}',
-    '@media (max-width:560px){.autoseg{margin-left:0}}'
+    /* ★自動ボタンは119px 取る。上の帯は .progress{flex:1} が余りを吸う作りなので、
+       そのままだと幅390で進捗バーが 161px → 29px に潰れる（実測）。
+       狭い画面では進捗バーを次の行へ回して幅を返す。
+       body.auto-ready で限定するので、このブロックが無いページには一切 効かない。
+       詳細度は body+3クラス なので、既存の .meta より強く、記述順に依存しない */
+    '@media (max-width:560px){',
+    '  .autoseg{margin-left:0}',
+    '  body.auto-ready .topbar .meta{flex-wrap:wrap;row-gap:8px}',
+    '  body.auto-ready .topbar .meta > .progress{flex:1 1 100%;order:9}',
+    '}'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -3006,7 +3015,7 @@ renderQuestion();
   bSpeed.type = 'button'; bSpeed.id = 'autospeed'; bSpeed.title = '表示の速さを変える';
   seg.appendChild(bToggle); seg.appendChild(bSpeed);
   var meta = document.querySelector('.topbar .meta') || document.querySelector('.topbar');
-  if (meta) meta.appendChild(seg);
+  if (meta) { meta.appendChild(seg); document.body.classList.add('auto-ready'); }
 
   function paintUI(){
     bToggle.textContent = st.on ? '⏸ 自動 ON' : '▶ 自動';
