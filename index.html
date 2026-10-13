@@ -393,7 +393,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 d78c7008</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 2fbf07ec</span>
   </div>
 </div>
 
@@ -3034,7 +3034,10 @@ renderQuestion();
   function paintUI(){
     bToggle.textContent = st.on ? '⏸ 自動 ON' : '▶ 自動';
     bToggle.setAttribute('aria-pressed', st.on ? 'true' : 'false');
-    bSpeed.textContent = speedLabel();
+    // ★ラベルだけだと何のボタンか判らない（2026-10-13 本人「速さは…どこにある？」）。
+    //   『ふつう』だけでは状態表示に見えるので、何を切り替えるのかを文字に出す。
+    bSpeed.textContent = '速さ ' + speedLabel();
+    bSpeed.setAttribute('aria-label', '表示の速さ: ' + speedLabel() + '（押すと変わる）');
     document.body.classList.toggle('auto-on', st.on);
     document.body.classList.toggle('auto-paused', st.on && paused);
     document.body.classList.toggle('auto-nolock', st.on && noLock);
