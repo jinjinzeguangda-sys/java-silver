@@ -1086,7 +1086,7 @@ public class SubSample extends Sample {
 // Main: new SubSample(100) と new SubSample("sample",200,100) を生成し表示`,
   options:['sample 200 100\nsample 200 100','null 0 100\nsample 200 100','SubSampleクラスの3行目だけでコンパイルエラーになる','SubSampleクラスの8行目だけでコンパイルエラーになる','SubSampleクラスの3行目と8行目の両方でコンパイルエラーになる'],
   answer:4,
-  exp:'SubSample(int) の先頭に暗黙の <code>super()</code> が入るが、Sample に引数なしコンストラクタが無くエラー（3行目）。もう一方は <code>super(name,num)</code> の後に <code>this(price)</code> を呼んでいるが、コンストラクタ呼び出しは<b>先頭に1つだけ</b>なのでエラー（8行目）。※「先頭に」は Java SE 11〜21 の話で、Java 25 以降（JEP 513）は super() の前に文を書ける。よって両方 → E。'},
+  exp:'SubSample(int) の先頭に暗黙の <code>super()</code> が入るが、Sample に引数なしコンストラクタが無くエラー（3行目）。もう一方は <code>super(name,num)</code> の後に <code>this(price)</code> を呼んでいるが、コンストラクタ呼び出しは<b>先頭に1つだけ</b>なのでエラー（8行目）。※Java 25 以降（JEP 513）は super() の前に<b>文</b>を書けるようになったが、コンストラクタ呼び出しを2つ書けないのは変わらないので、<b>8行目は Java 25 でもエラー</b>（実測: --release 11 / 21 / 25 のどれでも 3行目・8行目の2個）。よって両方 → E。'},
 
  {id:'b45',cat:'オーバーライド / @Override',src:'第12章 問45',
   prompt:'test メソッドのオーバーライドとして「正しくない」ものを選びなさい。（interface Sample に void test();）',
