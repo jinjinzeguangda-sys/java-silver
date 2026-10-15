@@ -425,7 +425,7 @@ public class A {
 }`,
   options:['java a/A.java','java b/B.java','javac b/B.java\njava a/A.java','javac a/A.java\njava a/A'],
   answer:3,
-  exp:'java コマンドはクラスファイルを作らない（SE11 のソースファイルモードはメモリ上で実行するだけ）。<code>javac a/A.java</code> は依存先の B も自動コンパイルして A.class・B.class を両方生成 → その後 <code>java a/A</code> で実行。よって D。'},
+  exp:'java コマンドはクラスファイルを作らない（SE11 のソースファイルモードはメモリ上で実行するだけ）。<code>javac a/A.java</code> は依存先の B も自動コンパイルして A.class・B.class を両方生成 → その後 <code>java a/A</code> で実行。よって D。※ソースファイルモードは JDK 22 以降 複数ファイルのプログラムも実行できるので、A の <code>java a/A.java</code> は新しい JDK なら<b>実行自体は成功する</b>。それでもクラスファイルは1つも作られない（実測 OpenJDK 26）ので、設問の答えは D のまま。'},
 
  {id:'b2',cat:'パッケージ / 記述順序',src:'第12章 問2',
   prompt:'package・import・class の3つを記述する順番として正しいものは？',
@@ -664,7 +664,7 @@ public class D implements B, C {
 }`,
   options:['Bインタフェースのsampleメソッドを実装している','Cインタフェースのsampleメソッドを実装している','Dクラスがsampleメソッドを使わないのであれば、オーバーライドをする必要はない','コンパイルエラーが発生する'],
   answer:3,
-  exp:'B・C 両方が default の <code>sample()</code> を持つ<b>菱形継承</b>で、D はオーバーライド必須。<code>super.sample()</code> は B・C どちらのデフォルトか特定できず<b>コンパイルエラー</b>。<code>B.super.sample()</code> のように呼び出し先インターフェースを明示する必要がある。'},
+  exp:'B・C 両方が default の <code>sample()</code> を持つ<b>菱形継承</b>で、D はオーバーライド必須。クラスの中の <code>super.</code> は<b>スーパークラス（ここでは Object）</b>を指すため、<code>super.sample()</code> は「シンボルを見つけられません」で<b>コンパイルエラー</b>になる（実装するインタフェースが1つだけでも同じ）。<code>B.super.sample()</code> のように呼び出し先インターフェースを明示する必要がある。'},
 
  {id:'b20',cat:'メソッド / シグニチャ',src:'第12章 問20',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
@@ -902,7 +902,7 @@ public class Main {
 }`,
   options:['3が表示される','b1が表示される','1が表示される','b2が表示される'],
   answer:0,
-  exp:"c='b' が case 'b' に合致 → i++(1)。break が無く<b>フォールスルー</b> → case 'c'|'d' で i++(2) → case 'e' で i++(3) → break。default は実行されず。よって 3。",
+  exp:"c='b' が case 'b' に合致 → i++(1)。break が無く<b>フォールスルー</b> → case 'c'|'d' で i++(2) → case 'e' で i++(3) → break。default は実行されず。よって 3。⚠️ ここでの <code>case &#39;c&#39; | &#39;d&#39;</code> は「c または d」ではなく<b>ビット論理和</b>の定数式で、値は 99|100 = 103 = <code>&#39;g&#39;</code> の1つだけ。したがって c が &#39;c&#39; や &#39;d&#39; のときはこの case に一致せず default に入る。",
   },
 
  {id:'b35',cat:'継承 / privateメソッド',src:'第12章 問35',
@@ -1086,7 +1086,7 @@ public class SubSample extends Sample {
 // Main: new SubSample(100) と new SubSample("sample",200,100) を生成し表示`,
   options:['sample 200 100\nsample 200 100','null 0 100\nsample 200 100','SubSampleクラスの3行目だけでコンパイルエラーになる','SubSampleクラスの8行目だけでコンパイルエラーになる','SubSampleクラスの3行目と8行目の両方でコンパイルエラーになる'],
   answer:4,
-  exp:'SubSample(int) の先頭に暗黙の <code>super()</code> が入るが、Sample に引数なしコンストラクタが無くエラー（3行目）。もう一方は <code>super(name,num)</code> の後に <code>this(price)</code> を呼んでいるが、コンストラクタ呼び出しは<b>先頭に1つだけ</b>なのでエラー（8行目）。よって両方 → E。'},
+  exp:'SubSample(int) の先頭に暗黙の <code>super()</code> が入るが、Sample に引数なしコンストラクタが無くエラー（3行目）。もう一方は <code>super(name,num)</code> の後に <code>this(price)</code> を呼んでいるが、コンストラクタ呼び出しは<b>先頭に1つだけ</b>なのでエラー（8行目）。※「先頭に」は Java SE 11〜21 の話で、Java 25 以降（JEP 513）は super() の前に文を書ける。よって両方 → E。'},
 
  {id:'b45',cat:'オーバーライド / @Override',src:'第12章 問45',
   prompt:'test メソッドのオーバーライドとして「正しくない」ものを選びなさい。（interface Sample に void test();）',
@@ -1119,7 +1119,7 @@ public class SubSample extends Sample {
 }`,
   options:['Sample [a=10, b=10, c=10, d=10]','Sample [a=0, b=10, c=10, d=10]','Sample [a=0, b=0, c=0, d=10]','コンパイルエラーが発生する','実行時に例外がスローされる'],
   answer:0,
-  exp:'<code>a = b = this.c = setD(x)</code> は右から評価される。setD(10) が d に10を代入し10を返す → this.c に10 → b に10 → a に10。結果、全フィールドが10。'},
+  exp:'<code>a = b = this.c = setD(x)</code> は代入演算子が<b>右結合</b>なので <code>a = (b = (this.c = setD(x)))</code> と解釈される（オペランドの評価順そのものは常に左から右）。setD(10) が d に10を代入し10を返す → this.c に10 → b に10 → a に10。結果、全フィールドが10。'},
 
  {id:'b50',cat:'制御構文 / do-while',src:'第12章 問50',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
@@ -1158,7 +1158,7 @@ public class SubSample extends Sample {
 }`,
   options:['[0,0]=A [0,1]=B [1,0]=C [1,1]=D [2,0]=E [2,1]=F [2,2]=G','[0,0]=A [0,1]=B [1,0]=C [2,0]=D [2,1]=E [2,2]=F [2,3]=G','[0,0]=A [0,1]=B [1,0]=C [1,1]=D [2,0]=E [2,1]=F [3,0]=G','[0,0]=A [0,1]=B [0,2]=C [1,0]=D [1,1]=E [1,2]=F [1,3]=G'],
   answer:1,
-  exp:'各行（2次元目）の要素数が <b>2個・1個・4個</b> なので、i,j の進み方も 2→1→4。要素数がこの並びに合うのは B だけ。'},
+  exp:'各行（2次元目）の要素数が <b>2個・1個・4個</b> なので、i,j の進み方も 2→1→4。要素数がこの並びに合うのは B だけ。※選択肢は見やすさのため空白を省いた表記で、実際の出力は <code>[0, 0] = A</code> のように空白が入り、1行ずつ表示される。'},
 
  {id:'b57',cat:'例外 / catch順序',src:'第12章 問57',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
@@ -1249,7 +1249,7 @@ class SubSampleImpl extends SampleImpl {
 }`,
   options:['Sampleインタフェースでコンパイルエラーが発生する','SampleImplクラスでコンパイルエラーが発生する','SubSampleImplクラスでコンパイルエラーが発生する','正常にコンパイル、実行できる'],
   answer:3,
-  exp:'interface の抽象メソッド宣言、SampleImpl の <code>test()</code> オーバーライドは正しい。SubSampleImpl の <code>test(int x)</code> は引数が異なるため<b>オーバーライドではなくオーバーロード</b>（別メソッド）で文法上問題なし。よって全て正常 → D。'},
+  exp:'interface の抽象メソッド宣言、SampleImpl の <code>test()</code> オーバーライドは正しい。SubSampleImpl の <code>test(int x)</code> は引数が異なるため<b>オーバーライドではなくオーバーロード</b>（別メソッド）で文法上問題なし。よって全て正常 → D。なお このコードには main メソッドが無いので、ここでの「実行できる」は<b>コンパイルが通り、文法上の問題が無い</b>という意味。'},
 
  {id:'b58',cat:'演算子 / 後置++',src:'第12章 問58',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
@@ -1420,7 +1420,7 @@ public class Main {
   code:``,
   options:['java -classpath com.example.jar -m com.example/com.sample.Main','java -classpath com.example.jar com.sample.Main','java --module-path mods -m com.example/com.sample.Main','java --module-path mods com.example/com.sample.Main'],
   answer:2,
-  exp:'モジュール内プログラムの実行は <code>--module-path</code> でモジュールのルートを指定し <code>-m モジュール名/完全修飾クラス名</code> を指定する → C。-m が無い D、モジュールパス未指定の A/B は不可。'},
+  exp:'モジュール内プログラムの実行は <code>--module-path</code> でモジュールのルートを指定し <code>-m モジュール名/完全修飾クラス名</code> を指定する → C。-m が無い D は不可。A は -classpath と -m の組み合わせなので不可。B は実際には<b>クラスパス上の無名モジュール</b>として起動してしまうが、その場合 module-info は無視されるので「モジュールとして実行する」ことにはならない。'},
 
  {id:'b75',cat:'モジュール / module-info',src:'第12章 問75',
   prompt:'モジュール a は b に依存し、全モジュールから com.sample にアクセスさせたい。合致する module-info.java は？',
@@ -1590,12 +1590,12 @@ module B {
   code:``,
   options:['jmod describe','jdeps --list-deps','java Hello.java','jar --show-module-resolution','java --show-module-resolution'],
   answers:[1,4],
-  exp:'クラスの依存は <code>jdeps</code>（B）、モジュールの依存は <code>java --show-module-resolution</code>（E）。jmod はモジュール作成用、java の単一ファイル実行は依存調査不可、jar に該当オプションは無い。'},
+  exp:'クラスの依存は <code>jdeps</code>（B）、モジュールの依存は <code>java --show-module-resolution</code>（E）。jmod describe は JMOD ファイルの宣言を表示するだけで jdeps のような依存解析はしない、java の単一ファイル実行は依存調査不可、jar に該当オプションは無い。'},
 
  {id:'m17',cat:'修飾子',src:'第12章 問17',multi:true,
   prompt:'修飾子に関する説明として正しいものを2つ選びなさい。',
   code:``,
-  options:['ローカル変数は、finalを付けて宣言できる','インタフェースは、protectedを付けて宣言できる','インスタンス変数は、staticを付けて宣言できる','抽象メソッドは、privateを付けて宣言できる','インナークラスは、publicを付けて宣言できる'],
+  options:['ローカル変数は、finalを付けて宣言できる','トップレベルのインタフェースは、protectedを付けて宣言できる','インスタンス変数は、staticを付けて宣言できる','抽象メソッドは、privateを付けて宣言できる','インナークラスは、publicを付けて宣言できる'],
   answers:[0,4],
   exp:'ローカル変数に final は可（A正）。メンバのインナークラスに public は可（E正）。トップレベル interface に protected は不可（B誤）、static を付けるとインスタンス変数ではなくクラス変数になる（C誤）、抽象メソッドは実装される前提で private 不可（D誤）。'},
 
@@ -3094,6 +3094,11 @@ renderQuestion();
   //   ★倍率 mul() は clamp の**後**に掛かるので、「ゆっくり」で逃げると短い問題まで間延びする。
   //   直すべきは上限の側。新しい値は式が全問を覆う最小値（794字→38,930ms / 解説517字→26,065ms）。
   //   下げたぶんは1問も無い＝短い問題の待ち時間は1ミリも変わっていない。
+  // ★2026-10-15 解説の上限を 27000→30000 に上げた。これも実測が理由:
+  //   java-bronze の空だった解説13問を drill から移植し、b44 に JEP 513 の注記を足した結果、
+  //   最長の解説が 517字→575字（28,675ms）になり、旧上限 27,000ms を 1,675ms 超えた。
+  //   全38本1,315問を数えて張り付いたのは この1問だけ。30000 は全問を覆う最小の切りの良い値で、
+  //   次に長い解説は java-bronze b26 の 517字＝26,065ms ＝ 27,000ms 未満の問題は1ミリも変わらない。
   function msFor(chars, base, lo, hi){
     var raw = base + chars * 45;
     return Math.round(Math.min(hi, Math.max(lo, raw)) * mul());
@@ -3282,7 +3287,7 @@ renderQuestion();
     try { window.scrollTo(0, 0); } catch(e){}   // 新しい問題は必ず最上部から（送る量を決める基準にもなる）
     schedule(msFor(textLen(document.querySelector('.qcard')), 3200, 5000, 40000), function(){
       autoReveal();
-      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 27000), function(){
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 30000), function(){
         if (pos >= queue.length - 1) { onePassDone(); }
         else if (typeof next === 'function') next();
       });
@@ -3304,7 +3309,7 @@ renderQuestion();
     persist(); paintUI(); wakeOn();
     // いまの問題がもう答え済みなら次から、まだなら この問題から
     if (typeof answered !== 'undefined' && answered) {
-      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 27000), function(){
+      schedule(msFor(textLen(document.getElementById('after')), 2800, 5000, 30000), function(){
         if (pos >= queue.length - 1) onePassDone(); else next();
       });
     } else {
