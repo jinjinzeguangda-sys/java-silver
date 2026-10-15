@@ -50,6 +50,12 @@
 // 保存が無いときは data-theme を当てない＝OSの設定に従う（従来どおりの見え方）。
 (function(){
   var KEY='jinji_theme', OK={dark:1,dim:1,bright:1}, TC={dark:'#14171C',dim:'#292F3A',bright:'#3E4858'};
+  // ★2026-10-15: 「暗い/中/明るい」の切り替えUIは 2026-09-30 に撤去した。
+  //   それ以前に dim / bright を選んだ端末は、**戻す手段が無いまま明るい配色で固定される**。
+  //   実際に本人のPCが dim(#292F3A) で固定されていて、未設定のiPad(#14171C)より明るく見えていた。
+  //   UIが無い以上 dim/bright は到達不能な状態なので、読み込み時に1回だけ捨てて既定の暗さに戻す。
+  try{ var _stale=localStorage.getItem(KEY);
+       if(_stale==='dim'||_stale==='bright') localStorage.removeItem(KEY); }catch(e){}
   function saved(){ try{ var t=localStorage.getItem(KEY);
     return OK[t]?t:null; }catch(e){ return null; } }
   function osDark(){ try{ return matchMedia('(prefers-color-scheme:dark)').matches; }
@@ -393,7 +399,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-13 2fbf07ec</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-10-15 540c6ef8</span>
   </div>
 </div>
 
@@ -1601,14 +1607,20 @@ module B {
   exp:'変数の次元数と配列インスタンスの次元数が一致する必要がある。A は2次元に2次元初期化子で一致。E は3次元 int[2][2][2] の2次元目要素(int[])に1次元配列を代入し正しい。B は3次元変数に2次元、C は2次元に1次元、D は <code>new int[][2]</code> が1次元目の要素数省略で不正。'},
 
  {id:'m23',cat:'オーバーロード / 型解決',src:'第12章 問23',multi:true,
-  prompt:'次のプログラムの説明として正しいものを3つ選びなさい。（a1=new A(), a2=new B(), b1=new B(), list は List 型）',
+  prompt:'次のプログラムの説明として正しいものを3つ選びなさい。',
   code:`public class A {
     public void sample(Collection arg) { System.out.println("A"); }
 }
 public class B extends A {
     public void sample(Collection arg) { System.out.println("B"); }
     public void sample(List arg)       { System.out.println("C"); }
-}`,
+}
+
+// 呼び出し側
+A a1 = new A();
+A a2 = new B();
+B b1 = new B();
+List list = new ArrayList();`,
   options:['a1.sample(list) を実行すると A が表示される','a2.sample(list) を実行すると A が表示される','a2.sample(list) を実行すると B が表示される','b1.sample(list) を実行すると B が表示される','b1.sample(list) を実行すると C が表示される'],
   answers:[0,2,4],
   exp:'a1(A型/A実体)→ A型の sample(Collection)→ "A"（A正）。a2(A型/B実体)→ コンパイル時は A型基準で sample(Collection) に解決、実行時に B のオーバーライドが動き "B"（B誤・C正）。b1(B型/B実体)→ 引数 list(List) に最も厳密な sample(List) が選ばれ "C"（D誤・E正）。'},
@@ -1869,6 +1881,11 @@ const KEY='javaSilverQuizV1';
 const LETTERS=['A','B','C','D','E','F','G'];
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{perCat:{},log:[]}}catch(e){return{perCat:{},log:[]}}}
 function save(s){try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
+// ★2026-10-15 本人指示「『選択肢をランダムに並び替え』をON・OFF切り替えを作ってほしい」
+//   状態は localStorage だけに持つ（読む側で毎回 引く）。変数に写すと、
+//   どちらが先に走るかで初回だけ既定に戻る。既定は ON＝これまでの挙動。
+var SHUF_KEY='quiz_optshuffle_v1';
+function shuffleOn(){ try{ return localStorage.getItem(SHUF_KEY)!=='0'; }catch(e){ return true; } }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
 let queue=QUESTIONS.map((_,i)=>i);   // 出題順（インデックス）
@@ -2292,7 +2309,11 @@ function fitLayout(force){
     //   選択肢を回しても高さが縮まなくなる（2026-09-24 実測: 選択肢の移動が12問→1問に激減）
     // ① 選択肢（末尾から1つずつ。右に最低2つ残す）… 回答の前後で動いてはいけないので予約する
     var oL=null;
-    if(opts.children.length>=4){
+    // ★2026-10-15 本人指摘:「選択肢DやFが左下のコードより下へ移動して他と大きく離れ見づらい」
+    //   コードの下の空白が残るより読みにくいので、選択肢は回さない（質問欄の移動は残す）。
+    //   戻すときは MOVE_OPTS_LEFT を true にする。
+    var MOVE_OPTS_LEFT=false;
+    if(MOVE_OPTS_LEFT && opts.children.length>=4){
       var best=h0, bestK=0, k=0;
       while(opts.children.length>2){
         if(!oL){ oL=document.createElement('div'); oL.className='opts-left';
@@ -2370,12 +2391,13 @@ function renderQuestion(){
       </div>
     </div>`;
   const opts=document.getElementById('opts');
-  const order=shuffle(q.options.map((_,i)=>i));   // 毎回シャッフル
+  // OFF のときは問題集の順（記号も A,B,C… の順に並ぶ）
+  const order=shuffleOn()?shuffle(q.options.map((_,i)=>i)):q.options.map((_,i)=>i);
   q._order=order;
   order.forEach((origIdx,dispIdx)=>{
     const b=document.createElement('button');
     b.className='opt'; b.type='button'; b.dataset.i=dispIdx;   // ★#61: 列を移しても番号で判定できるように
-    b.innerHTML=`<span class="key">${LETTERS[dispIdx]}</span><span class="txt">${esc(q.options[origIdx])}</span><span class="mark"></span>`;
+    b.innerHTML=`<span class="key">${LETTERS[origIdx]}</span><span class="txt">${esc(q.options[origIdx])}</span><span class="mark"></span>`;
     b.onclick=()=> q.multi ? toggleSel(dispIdx,b) : choose(dispIdx);
     opts.appendChild(b);
   });
@@ -2414,7 +2436,7 @@ function submitMulti(){
   save(s);
   sessDone++; if(correct)sessCorrect++;
   scoreEl.innerHTML='<b>'+sessCorrect+'</b> / '+sessDone+' 正解';
-  const answerLetters=[...correctDisp].sort((a,b)=>a-b).map(i=>LETTERS[i]).join('・');
+  const answerLetters=[...q.answers].sort((a,b)=>a-b).map(i=>LETTERS[i]).join('・');   // ★記号は原順（解説と揃える）
   const last=pos===queue.length-1;
   document.getElementById('after').innerHTML=`
     <div class="verdict ${correct?'ok':'ng'} reveal">${correct?'○ 正解':'× 不正解'} <span style="font-weight:500;color:var(--muted);font-size:13px">正解は ${answerLetters}</span></div>
@@ -2455,7 +2477,7 @@ function choose(i){
   const after=document.getElementById('after');
   const last=pos===queue.length-1;
   after.innerHTML=`
-    <div class="verdict ${correct?'ok':'ng'} reveal">${correct?'○ 正解':'× 不正解'} <span style="font-weight:500;color:var(--muted);font-size:13px">正解は ${LETTERS[correctDisp]}</span></div>
+    <div class="verdict ${correct?'ok':'ng'} reveal">${correct?'○ 正解':'× 不正解'} <span style="font-weight:500;color:var(--muted);font-size:13px">正解は ${LETTERS[q.answer]}</span></div>
     <div class="exp reveal">${q.exp}</div>
     ${renderTrace(q)}
     <div class="actions">
@@ -3027,7 +3049,16 @@ renderQuestion();
   bToggle.title = 'タップしなくても解答が出て次の問題へ進みます';
   var bSpeed = document.createElement('button');
   bSpeed.type = 'button'; bSpeed.id = 'autospeed'; bSpeed.title = '表示の速さを変える';
-  seg.appendChild(bToggle); seg.appendChild(bSpeed);
+  var bShuf = document.createElement('button');
+  bShuf.type = 'button'; bShuf.id = 'optshuffle';
+  bShuf.addEventListener('click', function(){
+    var on = !shuffleOn();
+    try { localStorage.setItem(SHUF_KEY, on ? '1' : '0'); } catch(e){}
+    paintUI();
+    // いまの問題を作り直す（ラッパー経由なので、自動モード中は周期も張り直される）
+    if (typeof renderQuestion === 'function') renderQuestion();
+  });
+  seg.appendChild(bToggle); seg.appendChild(bSpeed); seg.appendChild(bShuf);
   var meta = document.querySelector('.topbar .meta') || document.querySelector('.topbar');
   if (meta) { meta.appendChild(seg); document.body.classList.add('auto-ready'); }
 
@@ -3038,6 +3069,12 @@ renderQuestion();
     //   『ふつう』だけでは状態表示に見えるので、何を切り替えるのかを文字に出す。
     bSpeed.textContent = '速さ ' + speedLabel();
     bSpeed.setAttribute('aria-label', '表示の速さ: ' + speedLabel() + '（押すと変わる）');
+    var sh = shuffleOn();
+    bShuf.textContent = '並び ' + (sh ? 'ランダム' : '問題集順');
+    bShuf.setAttribute('aria-pressed', sh ? 'true' : 'false');
+    bShuf.title = sh ? '選択肢をランダムに並び替えています（押すと問題集の順に固定）'
+                     : '選択肢を問題集の順で出しています（押すとランダムに並び替え）';
+    bShuf.setAttribute('aria-label', '選択肢の並び: ' + (sh ? 'ランダム' : '問題集順') + '（押すと変わる）');
     document.body.classList.toggle('auto-on', st.on);
     document.body.classList.toggle('auto-paused', st.on && paused);
     document.body.classList.toggle('auto-nolock', st.on && noLock);
@@ -3076,6 +3113,21 @@ renderQuestion();
   var scrollTimers = [];
   function clearScrolls(){ for (var i = 0; i < scrollTimers.length; i++) clearTimeout(scrollTimers[i]); scrollTimers = []; }
   function maxScrollY(){ return Math.max(0, document.documentElement.scrollHeight - innerHeight); }
+  // ★2026-10-15 本人指摘:「下に行きすぎている。コードと選択肢が見える範囲で下スクロールを減らして」
+  //   文書の末尾(maxScrollY)まで送ると、カードの下の質問欄・余白のぶんだけ余計に送られる。
+  //   上限を『いま読むべき最後の要素の下端』にする＝解答前は選択肢まで、解答後は解説まで。
+  function limitY(){
+    var lim = maxScrollY();
+    var card = document.querySelector('.qcard'); if (!card) return lim;
+    var bottom = 0;
+    ['#after', '.opts', '.opts-left'].forEach(function(sel){
+      var el = card.querySelector(sel); if (!el) return;
+      var r = el.getBoundingClientRect(); if (r.height <= 0) return;   // 解答前の #after は空
+      var b = r.bottom + pageYOffset; if (b > bottom) bottom = b;
+    });
+    if (bottom <= 0) return lim;                       // 測れなければ従来どおり（0件に落とさない）
+    return Math.max(0, Math.min(lim, Math.ceil(bottom - innerHeight + 8)));
+  }
   function scrollToY(y){
     var soft = true;
     try { soft = !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
@@ -3087,10 +3139,10 @@ renderQuestion();
     var base = pageYOffset;
     var av = document.querySelector('.autoverdict');
     if (av) {                                      // 解答が出た＝まず見出しを画面の上端へ
-      var y = Math.min(maxScrollY(), base + av.getBoundingClientRect().top - 12);
+      var y = Math.min(limitY(), base + av.getBoundingClientRect().top - 12);
       if (y > base + 4) { scrollToY(y); base = y; }
     }
-    var over = maxScrollY() - base;
+    var over = limitY() - base;
     if (over <= 8) return 0;                       // 収まっている＝送らない
     var step = Math.max(160, innerHeight - 90);    // 90px 重ねて読み継ぐ
     var n = Math.ceil(over / step);
@@ -3098,7 +3150,7 @@ renderQuestion();
     for (var k = 1; k <= n; k++) {
       scrollTimers.push(setTimeout(function(){
         if (!st.on || paused || document.hidden) return;
-        scrollToY(Math.min(maxScrollY(), pageYOffset + step));
+        scrollToY(Math.min(limitY(), pageYOffset + step));
       }, Math.round(span * k / (n + 1))));
     }
     return n;
@@ -3188,7 +3240,7 @@ renderQuestion();
       set = {};
       var ds = q.answers.map(function(a){ return q._order.indexOf(a); }).sort(function(a,b){ return a-b; });
       ds.forEach(function(i){ set[i] = 1; });
-      letters = ds.map(function(i){ return LETTERS[i]; }).join('・');
+      letters = q.answers.slice().sort(function(a,b){ return a-b; }).map(function(i){ return LETTERS[i]; }).join('・');   // ★原順
       Array.prototype.forEach.call(btns, function(b){
         var bi = +b.dataset.i; b.disabled = true; b.classList.remove('sel');
         if (set[bi]) { b.classList.add('correct'); var m = b.querySelector('.mark'); if (m) m.textContent = '○'; }
@@ -3196,7 +3248,7 @@ renderQuestion();
       var mbar = document.getElementById('mbar'); if (mbar) mbar.remove();
     } else {
       correctDisp = q._order.indexOf(q.answer);
-      letters = LETTERS[correctDisp];
+      letters = LETTERS[q.answer];   // ★原順（解説と揃える）
       Array.prototype.forEach.call(btns, function(b){
         var bi = +b.dataset.i; b.disabled = true;
         if (bi === correctDisp) { b.classList.add('correct'); var m = b.querySelector('.mark'); if (m) m.textContent = '○'; }
