@@ -435,20 +435,22 @@ public class A {
   exp:'Java のソースファイルは <b>package宣言 → import宣言 → クラス宣言</b> の順で書く決まり。package は必ず先頭に置く。よって A。'},
 
  {id:'b3',cat:'パッケージ / import',src:'第12章 問3',
-  prompt:'Main クラスの空欄（2行目）に入るコードとして正しいものは？',
-  code:`// Sample
-package com.sample;
+  prompt:'次のプログラムを確認し、Mainクラスの空欄に入るコードとして、正しいものを選びなさい。（1つ選択）',
+  lnRestart:[8,15],
+  code:`package com.sample;
 public class Sample {
-    public void sample() { /* any code */ }
+    public void sample() {
+        // any code
+    }
 }
 
-// Test
 package com.sample.test;
 public class Test {
-    public void test(int num) { /* any code */ }
+    public void test(int num) {
+        // any code
+    }
 }
 
-// Main
 package com;
 ＿＿＿＿＿  ← 空欄
 public class Main {
@@ -1062,7 +1064,8 @@ public interface D extends B, C {
   exp:'Iterable は Collection・Path 双方のスーパー型なので、B・C はそれぞれ A の <code>a()</code> を共変戻り値で正しくオーバーライドできる。しかし D が B,C を多重継承すると <code>a()</code> の戻り値が Collection と Path（互いに無関係な型）で確定できず<b>コンパイルエラー</b>。'},
 
  {id:'b44',cat:'継承 / super・this',src:'第12章 問44',
-  prompt:'次のプログラムをコンパイル、実行した結果は？',
+  prompt:'次のプログラムをコンパイル、実行したときの結果として、正しいものを選びなさい。（1つ選択）',
+  lnRestart:[10,21],
   code:`public class Sample {
     String name;
     int num;
@@ -1083,7 +1086,14 @@ public class SubSample extends Sample {
     }
 }
 
-// Main: new SubSample(100) と new SubSample("sample",200,100) を生成し表示`,
+public class Main {
+    public static void main(String[] args) {
+        SubSample s1 = new SubSample(100);
+        SubSample s2 = new SubSample("sample", 200, 100);
+        System.out.println(s1.name + ", " + s1.num + ", " + s1.price);
+        System.out.println(s2.name + ", " + s2.num + ", " + s2.price);
+    }
+}`,
   options:['sample 200 100\nsample 200 100','null 0 100\nsample 200 100','SubSampleクラスの3行目だけでコンパイルエラーになる','SubSampleクラスの8行目だけでコンパイルエラーになる','SubSampleクラスの3行目と8行目の両方でコンパイルエラーになる'],
   answer:4,
   exp:'SubSample(int) の先頭に暗黙の <code>super()</code> が入るが、Sample に引数なしコンストラクタが無くエラー（3行目）。もう一方は <code>super(name,num)</code> の後に <code>this(price)</code> を呼んでいるが、コンストラクタ呼び出しは<b>先頭に1つだけ</b>なのでエラー（8行目）。※Java 25 以降（JEP 513）は super() の前に<b>文</b>を書けるようになったが、コンストラクタ呼び出しを2つ書けないのは変わらないので、<b>8行目は Java 25 でもエラー</b>（実測: --release 11 / 21 / 25 のどれでも 3行目・8行目の2個）。よって両方 → E。'},
@@ -1771,7 +1781,7 @@ const FIGS = {
 /* BOOKFIGS_START */
 const BOOK_FIGS = {
   'b1':{lines:{10:['info','A が別パッケージ b の B を import（依存）'],14:['ok','B を利用 → javac a/A.java が B も自動コンパイル']},out:'結果：javac a/A.java で A・B 生成→java a/A（D）'},
-  'b3':{lines:{8:['info','Test はサブパッケージ（ワイルドカード * に含まれない）'],15:['ok','空欄に com.sample.Sample と com.sample.test.* の import が必要']},out:'結果：両パッケージを個別 import（C）'},
+  'b3':{lines:{8:['info','Test はサブパッケージ（ワイルドカード * に含まれない）'],16:['ok','空欄に com.sample.Sample と com.sample.test.* の import が必要']},out:'結果：両パッケージを個別 import（C）'},
   'b4':{lines:{6:['err','ラムダが i を参照 → i は実質的final でなければならない'],7:['err','i++ で i を変更 → 実質的final が崩れコンパイルエラー']},out:'結果：コンパイルエラー（実質的finalでない）'},
   'b5':{lines:{2:['info','クラス変数 num=23（ローカル num に隠蔽される）'],4:['err','右辺 num は未初期化のローカル変数 → コンパイルエラー']},out:'結果：コンパイルエラー（未初期化ローカル変数を参照）'},
   'b7':{lines:{5:['ok','data=1 はどの case にも一致せず default → C（break無し）'],6:['ok','case 0 へフォールスルー → A → break']},out:'結果：「CA」と表示'},
@@ -1803,7 +1813,7 @@ const BOOK_FIGS = {
   'b41':{lines:{6:['info','B: A.a()をCollectionへ共変オーバーライド（正）'],10:['info','C: A.a()をPathへ共変オーバーライド（正）'],13:['err','B,C多重継承でa()の戻り値がCollectionとPathで確定不可']},out:'結果：Dインターフェースでコンパイルエラー'},
   'b42':{lines:{4:['info','Aのフィールド x="A"'],12:['info','Bで同名フィールド x="B"（隠蔽）'],22:['info','宣言型A・実体B'],23:['ok','フィールドは宣言型Aで解決 → "A"']},out:'結果：Aが表示される'},
   'b43':{lines:{3:['info','isValueはAでprivate（同一クラス内限定）'],11:['err','サブクラスBからprivate isValueは参照不可 → コンパイルエラー']},out:'結果：コンパイルエラー'},
-  'b44':{lines:{12:['err','暗黙super()を呼ぶがSampleに引数なしコンストラクタ無し'],16:['info','super(name,num)でスーパー呼び出し'],17:['err','super()の後にthis() → コンストラクタ呼出は先頭1つのみ']},out:'結果：3行目と8行目の両方でコンパイルエラー'},
+  'b44':{lines:{12:['err','暗黙super()を呼ぶがSampleに引数なしコンストラクタ無し'],16:['info','super(name,num)でスーパー呼び出し'],17:['err','super()の後にthis() → コンストラクタ呼出は先頭1つのみ']},out:'結果：SubSampleクラスの3行目と8行目の両方でコンパイルエラー'},
   'b45':{lines:{2:['info','抽象メソッドtest()。@Overrideはこの実装にのみ付与可']},out:'結果：implements無しで@Override付けのB（SampleTest2）が不正'},
   'b46':{lines:{4:['info','now = 現在日付（2019-08-14）'],8:['ok','LocalDateのprintlnは既定でISO書式 yyyy-MM-dd']},out:'結果：2019-08-14 と表示される'},
   'b48':{lines:{3:['info','i=1 で開始'],4:['info','argsは a,b,c の3要素（クラス名Mainは入らない）'],5:['ok','後置i++は加算前の値 → 1) a  2) b  3) c']},out:'結果：1) a / 2) b / 3) c と表示される'},
@@ -1912,11 +1922,21 @@ function renderFigure(q){
   return `<div class="figure reveal"><div class="fig-label">図解 — プログラムの流れ</div><div class="figbox">${rows}</div>${out}</div>`;
 }
 
+// 原本が「クラスごとに 1 から数え直す」問題の見える行番号。q.lnRestart=[各リストの開始行(通し番号)]。
+// data-ln は通し番号のまま（FIGSのキー・図解の差し込みが通し番号で引くため）、見える番号だけ数え直す。
+// 開始行の直前の空行は、リストの区切りなので番号を付けない。lnRestart が無い問題は従来どおり通し番号。
+function dispNo(q,i){
+  const rs=q.lnRestart; if(!rs) return String(i);
+  if(rs.indexOf(i+1)>=0) return '';
+  let s=1; rs.forEach(r=>{ if(r<=i) s=r; });
+  return String(i-s+1);
+}
+
 // 問題文のコードを、行番号つきの注釈可能ブロックとして描画（回答前は注釈なし）
 function codeBlockHtml(q){
   if(!q.code) return '';
   const lines=q.code.split('\n');
-  const rows=lines.map((ln,i)=>`<div class="figline" data-ln="${i+1}"><span class="fno">${i+1}</span><span class="fcode">${esc(ln)||' '}</span></div>`).join('');
+  const rows=lines.map((ln,i)=>`<div class="figline" data-ln="${i+1}"><span class="fno">${dispNo(q,i+1)}</span><span class="fcode">${esc(ln)||' '}</span></div>`).join('');
   return `<div class="figbox qcode" id="qcode">${rows}</div>`;
 }
 
@@ -1964,25 +1984,30 @@ let selected=new Set();
 function _codeLine(q,n){ return ((q.code||'').split('\n')[n-1]||'').trim(); }
 function _stripTags(s){ return String(s||'').replace(/<[^>]+>/g,''); }
 function _askLineExplain(q,n){
-  const d=q.detail&&q.detail.lines&&q.detail.lines[n];
   const f=(typeof FIGS!=='undefined')?FIGS[q.id]:null;
-  const fg=f&&f.lines&&f.lines[n]?f.lines[n][1]:null;
-  const note=d||fg;
+  const noteAt=i=>{ const d=q.detail&&q.detail.lines&&q.detail.lines[i]; const fg=f&&f.lines&&f.lines[i]?f.lines[i][1]:null; return d||fg; };
+  let idx=n;                                   // 通し番号
+  if(q.lnRestart){                             // 見える番号 n → 通し番号（注釈の在る行が1つに決まる時だけ答える）
+    const c=[]; (q.code||'').split('\n').forEach((_,k)=>{ if(dispNo(q,k+1)===String(n)&&noteAt(k+1)) c.push(k+1); });
+    if(c.length!==1) return null;
+    idx=c[0];
+  }
+  const note=noteAt(idx);
   if(!note) return null;
-  return n+'行目「'+_codeLine(q,n)+'」\n→ '+note;
+  return n+'行目「'+_codeLine(q,idx)+'」\n→ '+note;
 }
 function _askFlow(q){
   const cl=(q.code||'').split('\n');
   if(q.detail&&q.detail.lines){
     let s='【コードの流れ（行ごと）】\n';
-    cl.forEach((ln,i)=>{ const t=ln.trim(); if(!t) return; const nt=q.detail.lines[i+1]; s+=(i+1)+'行目：'+t+(nt?'\n　→ '+nt:'')+'\n'; });
+    cl.forEach((ln,i)=>{ const t=ln.trim(); if(!t) return; const nt=q.detail.lines[i+1]; s+=dispNo(q,i+1)+'行目：'+t+(nt?'\n　→ '+nt:'')+'\n'; });
     if(q.detail.out) s+='\n'+q.detail.out;
     return s;
   }
   const f=(typeof FIGS!=='undefined')?FIGS[q.id]:null;
   if(f&&f.lines){
     let s='【コードの流れ（要点）】\n';
-    Object.keys(f.lines).sort((a,b)=>a-b).forEach(n=>{ s+=n+'行目：'+_codeLine(q,+n)+'\n　→ '+f.lines[n][1]+'\n'; });
+    Object.keys(f.lines).sort((a,b)=>a-b).forEach(n=>{ s+=dispNo(q,+n)+'行目：'+_codeLine(q,+n)+'\n　→ '+f.lines[n][1]+'\n'; });
     if(f.out) s+='\n'+f.out;
     return s;
   }
