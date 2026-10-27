@@ -2518,17 +2518,38 @@ function next(){
   else showResults();
 }
 
+// 成績の集計単位＝分類の「 / 」の前（大分類）。分類は77種と細かく1分類が1〜2問なので、
+// そのままだと「70%未満＝要復習」が1問の正誤で決まってしまう。集計は現在の問題に在る分類だけ（出題順）。
+// ★以前は Object.keys(ADVICE)（最初の8分野）だけを数えていて、本の80問に差し替えた後は2問しか入らなかった。
+function catGroup(c){ return String(c||'').split(' / ')[0]; }
+function groupedPerCat(s){
+  const order=[], g={};
+  QUESTIONS.forEach(q=>{
+    const k=catGroup(q.cat);
+    if(!g[k]){ g[k]={a:0,c:0,cats:[]}; order.push(k); }
+    if(g[k].cats.indexOf(q.cat)<0) g[k].cats.push(q.cat);
+  });
+  order.forEach(k=>g[k].cats.forEach(c=>{ const d=s.perCat[c]; if(d){ g[k].a+=d.a; g[k].c+=d.c; } }));
+  return {order:order,g:g};
+}
+function weakGroups(s){ const r=groupedPerCat(s); return r.order.filter(k=>r.g[k].a>0&&(r.g[k].c/r.g[k].a)<0.7); }
+// 重点対策の文。ADVICE にその分類の文が在れば それを、無ければ固定文。
+function adviceFor(k,g){
+  const t=g[k].cats.map(c=>ADVICE[c]).filter(Boolean);
+  return t.length?t.join(' '):'この分野（'+k+'）は解説を読み直して、間違えた問題をもう一度解く。';
+}
+
 function showResults(){
   pbar.style.width='100%';
   const s=load();
-  const cats=Object.keys(ADVICE);
+  const gp=groupedPerCat(s), cats=gp.order, G=gp.g;
   let totA=0,totC=0;
-  cats.forEach(c=>{const d=s.perCat[c];if(d){totA+=d.a;totC+=d.c;}});
+  cats.forEach(c=>{totA+=G[c].a;totC+=G[c].c;});
   const pct=totA?Math.round(totC/totA*100):0;
-  const weak=cats.filter(c=>{const d=s.perCat[c];return d&&d.a>0&&(d.c/d.a)<0.7;});
+  const weak=cats.filter(c=>G[c].a>0&&(G[c].c/G[c].a)<0.7);
 
   let barsHtml=cats.map(c=>{
-    const d=s.perCat[c]||{a:0,c:0};
+    const d=G[c];
     const p=d.a?Math.round(d.c/d.a*100):0;
     const isWeak=d.a>0&&p<70;
     const col=d.a===0?'var(--border)':(p<50?'var(--ng)':p<70?'var(--accent)':'var(--ok)');
@@ -2544,7 +2565,7 @@ function showResults(){
     '基礎の詰め直しから。要復習の分野を1つずつ潰しましょう。';
 
   let adviceHtml = weak.length
-    ? weak.map(c=>`<div class="advice"><div class="a-cat">${esc(c)} <span class="weak-badge">要復習</span></div><div class="a-txt">${esc(ADVICE[c])}</div></div>`).join('')
+    ? weak.map(c=>`<div class="advice"><div class="a-cat">${esc(c)} <span class="weak-badge">要復習</span></div><div class="a-txt">${esc(adviceFor(c,G))}</div></div>`).join('')
     : (totA?'<div class="empty">要復習の分野はありません。全分野70%以上。この調子！</div>':'<div class="empty">問題を解くと、ここに弱点分野と対策が出ます。</div>');
 
   stage.innerHTML=`
@@ -2570,8 +2591,8 @@ function showResults(){
 function restart(){queue=QUESTIONS.map((_,i)=>i);pos=0;sessCorrect=0;sessDone=0;renderQuestion();window.scrollTo({top:0,behavior:'smooth'});}
 function retryWeak(){
   const s=load();
-  const weak=Object.keys(ADVICE).filter(c=>{const d=s.perCat[c];return d&&d.a>0&&(d.c/d.a)<0.7;});
-  const idx=QUESTIONS.map((q,i)=>i).filter(i=>weak.includes(QUESTIONS[i].cat));
+  const weak=weakGroups(s);
+  const idx=QUESTIONS.map((q,i)=>i).filter(i=>weak.includes(catGroup(QUESTIONS[i].cat)));
   queue=idx.length?idx:QUESTIONS.map((_,i)=>i);
   pos=0;sessCorrect=0;sessDone=0;renderQuestion();window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -2879,7 +2900,8 @@ renderQuestion();
       b.type='button';
       b.className='cbtq'+(s.r==='ok'?' ok':s.r==='ng'?' ng':'')+(s.f?' fl':'')
                  +(queue[pos]===i?' cur':'');
-      b.textContent=String(q.id).replace(/^\D+/,'')||String(i+1);
+      var mq=String(q.src||'').match(/問(\d+)/);
+      b.textContent=(mq&&mq[1])||String(q.id).replace(/^\D+/,'')||String(i+1);
       b.title=(q.cat||'')+(s.r?(s.r==='ok'?'／前回○':'／前回×'):'');
       b.onclick=function(){ jump(i); };
       grid.appendChild(b);
