@@ -411,7 +411,7 @@
   <div id="stage"></div>
   <div class="footer">
     成績はこの端末のブラウザ内にのみ保存されます（localStorage）。<br>
-    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-11-09 5fe74032</span>
+    <span class="warn">問題集から抽出した本物の問題を順次追加中（全問コード実行＋解答照合で検証済み）＋補助問題。</span><br><span class="build">build 2026-11-25 fe998ac1</span>
   </div>
 </div>
 
@@ -547,23 +547,20 @@ public class Sample {
 
  {id:'b10',cat:'継承 / 抽象メソッド',src:'第12章 問10',
   prompt:'次のプログラムのコンパイルを成功させる方法は？',
-  code:`// interface A
-public interface A {
+  code:`public interface A {
     abstract void x();
 }
 
-// abstract class B
 public abstract class B /* position 1 */ {
     /* position 2 */
     public void x() {}
     public abstract void z();
 }
 
-// class C
 public class C extends B implements A {
     /* position 3 */
 }`,
-  options:['position 3 に @Override public void x() {} を記述','position 3 に public void z() {} を記述','position 2 に void x() {} を記述','position 1 に implements A を記述'],
+  options:['以下をposition 3に記述する\n@Override\npublic void x() {}','以下をposition 3に記述する\npublic void z() {}','以下をposition 2に記述する\nvoid x(){}','以下をposition 1に記述する\nimplements A'],
   answer:1,
   exp:'具象クラス C は、継承した抽象クラス B の抽象メソッド <code>z()</code> を実装する必要がある → position 3 に <code>public void z(){}</code>（B）。インターフェース A の <code>x()</code> は B が具象実装 <code>public void x(){}</code> を持ち C が継承するため、C 側での実装は不要。'},
 
@@ -709,6 +706,7 @@ public class D implements B, C {
 public class B extends A {
     @Override
     public double getValue() {
+        // ...
         return 1.0;
     }
 }
@@ -720,7 +718,7 @@ public class C extends B {
         return super.getValue();
     }
 }`,
-  options:['Bクラスのサブクラスでは、getValueメソッドでAクラスのフィールドにアクセスすることができる','Bクラスのサブクラスでは、super.getValue()は使えるがAクラスのフィールドにはアクセスできない','Bクラスのメソッドを呼び出すために new.getValue() を使う','Bクラスのメソッドを呼び出すために public.getValue() を使う'],
+  options:['Bクラスのサブクラスでは、getValueメソッドでAクラスのフィールドにアクセスすることができる','Bクラスのサブクラスでは、Bクラスのメソッドを呼び出すためにsuper.getValue()を使えるが、Aクラスのフィールドにはアクセスできない','Bクラスのサブクラスでは、Bクラスのメソッドを呼び出すためにnew.getValue()を使う','Bクラスのサブクラスでは、Bクラスのメソッドを呼び出すためにpublic.getValue()を使う'],
   answer:0,
   exp:'num はパッケージプライベートだが同一（無名）パッケージなので、B のサブクラス C から <code>super.num</code> で A のフィールドにアクセスできる（A 正）。スーパークラスのメソッド呼び出しは <code>super</code> を使うので <code>new.getValue()</code>/<code>public.getValue()</code> の C・D は誤り。'},
 
@@ -941,25 +939,29 @@ public class B extends A {
 
  {id:'b42',cat:'継承 / フィールド隠蔽',src:'第12章 問42',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
-  code:`// ex42/a/A.java
-package ex42.a;
+  code:`package ex42.a;
+
 public class A {
     public String x = "A";
     protected A() { }
 }
 
-// ex42/b/B.java
 package ex42.b;
+
 import ex42.a.A;
+
 public class B extends A {
     String x = "B";
-    public B() { super(); }
+    public B() {
+        super();
+    }
 }
 
-// ex42/Main.java
 package ex42;
-import ex42.b.B;
+
 import ex42.a.A;
+import ex42.b.B;
+
 public class Main {
     public static void main(String[] args) {
         A a = new B();
@@ -1061,17 +1063,22 @@ public class Main {
     public Iterable a();
 }
 
+import java.util.Collection;
+
 public interface B extends A {
     public Collection a();
 }
+
+import java.nio.file.Path;
 
 public interface C extends A {
     public Path a();
 }
 
 public interface D extends B, C {
+
 }`,
-  options:['Dインタフェースが2つ以上継承しているため','BインタフェースがAとは異なる戻り値型の同名メソッドを定義しているため','BとCインタフェースから継承したメソッドの戻り値型が異なるため','Dインタフェースで継承したメソッドを再定義しなかったため'],
+  options:['Dインタフェースが2つ以上継承しているため','BインタフェースがAインタフェースとは異なる戻り値型の同名メソッドを定義しているため','BとCインタフェースから継承したメソッドの戻り値型が異なるため','Dインタフェースで継承したメソッドを再定義しなかったため'],
   answer:2,
   exp:'Iterable は Collection・Path 双方のスーパー型なので、B・C はそれぞれ A の <code>a()</code> を共変戻り値で正しくオーバーライドできる。しかし D が B,C を多重継承すると <code>a()</code> の戻り値が Collection と Path（互いに無関係な型）で確定できず<b>コンパイルエラー</b>。'},
 
@@ -1122,14 +1129,27 @@ public class Main {
  {id:'b49',cat:'変数スコープ / 複合代入',src:'第12章 問49',
   prompt:'次のプログラムをコンパイル、実行した結果は？',
   code:`public class Sample {
-    int a; int b; int c; int d;
-    void setA(int a) { a = a; }
-    void setB() { this.b = b; }
-    int setC() { return c; }
-    int setD(int num) { d = num; return d; }
+    int a;
+    int b;
+    int c;
+    int d;
+    void setA(int a) {
+        a = a;
+    }
+    void setB() {
+        this.b = b;
+    }
+    int setC() {
+        return c;
+    }
+    int setD(int num) {
+        d = num;
+        return d;
+    }
     void setAll(int x) {
         a = b = this.c = setD(x);
     }
+    @Override
     public String toString() {
         return "Sample [a=" + a + ", b=" + b + ", c=" + c + ", d=" + d + "]";
     }
@@ -1207,10 +1227,17 @@ public class Main {
 
 public class Diary {
     private LocalDate now = LocalDate.now();
-    public LocalDate getNow() { return this.now; }
+    public LocalDate getNow() {
+        return this.now;
+    }
 }
 
-// Main: new Diary().getNow() を println する`,
+public class Main {
+    public static void main(String[] args) {
+        Diary d = new Diary();
+        System.out.println(d.getNow());
+    }
+}`,
   options:['「2019-08-14」と表示される','「08-14-2019」と表示される','「14-08-2019」と表示される','「08-14」と表示される','「2019-08」と表示される'],
   answer:0,
   exp:'<code>LocalDate</code> をそのまま println すると既定の <b>ISO 書式「年-月-日」(yyyy-MM-dd)</b> で出力される。よって「2019-08-14」。'},
@@ -1248,10 +1275,14 @@ public class Main {
 
  {id:'b53',cat:'Math.round / 型変換',src:'第12章 問53',
   prompt:'「2.5」と表示されるように、空欄に入るコードは？（byte x = 5, y = 2）',
-  code:`byte x = 5, y = 2;
-______________  // 空欄
-System.out.println(a);`,
-  options:['float a = Math.round((float) x / y * 100) / (float) 100;','float a = (float) (Math.round((float) x / y * 100) / 100);','float a = Math.round((int) (x / y), 2);','float a = Math.round((float) x / y, 2);'],
+  code:`public class Main {
+    public static void main(String[] args) {
+        byte x = 5, y = 2;
+        ______________  // 空欄
+        System.out.println(a);
+    }
+}`,
+  options:['float a = Math.round((float) x / y * 100) / (float) 100;','float a = (float) (Math.round((float) x / y * 100)/100);','float a = Math.round((int) (x / y), 2 );','float a = Math.round((float) x / y, 2 );'],
   answer:0,
   exp:'A は (float)x/y*100 = 250.0 を round して 250、それを (float)100 で割り <b>2.5</b>。B は round 後 250 を int の 100 で割るため小数が切り捨てられ 2.0。C・D は <code>Math.round</code> に引数を2つ渡しており（round に2引数版は無く）コンパイルエラー。'},
 
@@ -1263,11 +1294,15 @@ System.out.println(a);`,
 
 class SampleImpl implements Sample {
     @Override
-    public void test() { /* do something */ }
+    public void test() {
+        // do something
+    }
 }
 
 class SubSampleImpl extends SampleImpl {
-    void test(int x) { /* do something */ }
+    void test(int x) {
+        // do something...
+    }
 }`,
   options:['Sampleインタフェースでコンパイルエラーが発生する','SampleImplクラスでコンパイルエラーが発生する','SubSampleImplクラスでコンパイルエラーが発生する','正常にコンパイル、実行できる'],
   answer:3,
@@ -1379,7 +1414,7 @@ class SubSampleImpl extends SampleImpl {
     }
 }
 
-public class B extends A {
+public class B extends A{
     B() {
         this(4);
         System.out.print("3");
@@ -1388,7 +1423,12 @@ public class B extends A {
         System.out.print(b);
     }
 }
-// Main: new B();`,
+
+public class Main {
+    public static void main(String[] args) {
+        B b = new B();
+    }
+}`,
   options:['2143が表示される','1234が表示される','4321が表示される','3421が表示される'],
   answer:0,
   exp:'new B()→B() が this(4)→B(int) → 暗黙 super()→A() が this(2)→A(int) で「2」→A() に戻り「1」→B(int) に戻り「4」→B() に戻り「3」。よって <b>2143</b>。'},
@@ -1400,8 +1440,15 @@ public class B extends A {
         System.out.println(num);
     }
 }
-// Main: List<Integer> list = List.of(1,2,3);
-//       list.forEach( ______ );`,
+
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> list = List.of(1, 2, 3);
+        list.forEach( ______ );
+    }
+}`,
   options:['new Sample()::print','Sample.print','Sample:print','Sample::print'],
   answer:3,
   exp:'メソッド参照は <b>クラス名::メソッド名</b>（コロン2個）。print は static なのでクラス名で参照する <code>Sample::print</code>（D）。A は static をインスタンス経由で不可、B・C は :: でない。'},
@@ -1409,7 +1456,7 @@ public class B extends A {
  {id:'b67',cat:'開発環境 / JDK',src:'第12章 問67',
   prompt:'Java の開発環境のセットアップに関する説明として正しいものは？',
   code:``,
-  options:['JDKをインストールするときは、特定のOS用のJava開発環境をセットアップする','Javaの開発環境はデフォルトですべてのOS用に設定されている','Javaの開発環境をセットアップするにはJREが必要である','JDKよりも前にIDEをインストールすれば、Javaの開発環境はセットアップされる'],
+  options:['JDKをインストールするときには、特定のオペレーティングシステム用のJava開発環境をセットアップする','Javaの開発環境はデフォルトですべてのOS用に設定されている','Javaの開発環境をセットアップするにはJREが必要である','JDKよりも前にIDE（統合開発環境）をインストールすれば、Javaの開発環境はセットアップされる'],
   answer:0,
   exp:'JDK は OS ごとに用意されており、使う OS 用をセットアップする（A 正）。JRE は JDK に含まれる（C 誤）、デフォルト設定はされない（B 誤）、IDE を入れても JDK は同時に入らない（D 誤）。'},
 
@@ -1509,20 +1556,28 @@ public class Main {
 
  {id:'b72',cat:'StringBuilder / replace',src:'第12章 問72',
   prompt:'「AXCD」と表示したい。空欄に入るコードは？（StringBuilder sb = new StringBuilder("ABCD")）',
-  code:`StringBuilder sb = new StringBuilder("ABCD");
-______________  // 空欄
-System.out.println(sb);`,
+  code:`public class Sample {
+    public static void main(String[] args) {
+        StringBuilder sb = new StringBuilder("ABCD");
+        ______________  // 空欄
+        System.out.println(sb);
+    }
+}`,
   options:['sb.replace(sb.indexOf("B"), sb.indexOf("B"), "X");','sb.replace(sb.indexOf("B"), sb.indexOf("C"), "X");','sb.replace(sb.indexOf("A"), sb.indexOf("B"), "X");','sb.replace(sb.indexOf("A"), sb.indexOf("C"), "X");'],
   answer:1,
   exp:'<code>replace(start, end, str)</code> は start〜end-1 の範囲を置換する。indexOf("B")=1、indexOf("C")=2 なので <code>replace(1, 2, "X")</code> はインデックス1の "B" だけを "X" に置換 → "ABCD"→"AXCD"。'},
 
  {id:'b73',cat:'制御構文 / for指定',src:'第12章 問73',
   prompt:'「135」と表示したい。空欄に入るコードは？（int[] array = {1,2,3,4,5}; for(空欄){ print(array[i]); }）',
-  code:`int[] array = { 1, 2, 3, 4, 5 };
-for ( ______________ ) {
-    System.out.print(array[i]);
+  code:`public class Main {
+    public static void main(String[] args) {
+        int[] array = { 1, 2, 3, 4, 5 };
+        for ( ______________ ) {
+            System.out.print(array[i]);
+        }
+    }
 }`,
-  options:['int i = 0; i <= 4; i++','int i = 0; i < 5; i += 2','int i = 1; i <= 5; i += 1','int i = 1; i < 5; i += 2'],
+  options:['int i = 0; i <= 4; i++','int i = 0; i < 5; i += 2','int i = 1; i <= 5; i += 1','int i = 1; i < 5; i +=2'],
   answer:1,
   exp:'「135」はインデックス 0,2,4（値 1,3,5）を出せばよい。i=0 から <code>i += 2</code> で 0,2,4 をアクセス →「135」。A は全部、C は範囲超過で例外、D は "24"。'},
 
@@ -1595,15 +1650,14 @@ uses java.sql.Driver`,
 const BOOK_MULTI_Q = [
  {id:'m6',cat:'モジュール / 相互依存',src:'第12章 問6',multi:true,
   prompt:'次の2つのモジュール設定ファイルの説明として正しいものを2つ選びなさい。',
-  code:`// モジュールA
-module A {
+  code:`module A {
     requires B;
 }
-// モジュールB
+
 module B {
     requires A;
 }`,
-  options:['どちらのモジュールもパッケージがエクスポートされない','どちらもjava.baseモジュールを必要としない','モジュールの名前が短すぎる','コンパイルエラーが発生する'],
+  options:['どちらのモジュールも、パッケージがエクスポートされない','どちらもjava.baseモジュールを必要としない','モジュールの名前が短すぎる','コンパイルエラーが発生する'],
   answers:[0,3],
   exp:'exports が無いのでどちらもパッケージを公開しない（A正）。A→B→A の相互依存（循環）でコンパイルエラー（D正）。java.base は全モジュールに暗黙 requires される（B誤）。モジュール名は1文字でも可（C誤）。'},
 
@@ -1617,7 +1671,7 @@ module B {
  {id:'m17',cat:'修飾子',src:'第12章 問17',multi:true,
   prompt:'修飾子に関する説明として正しいものを2つ選びなさい。',
   code:``,
-  options:['ローカル変数は、finalを付けて宣言できる','トップレベルのインタフェースは、protectedを付けて宣言できる','インスタンス変数は、staticを付けて宣言できる','抽象メソッドは、privateを付けて宣言できる','インナークラスは、publicを付けて宣言できる'],
+  options:['ローカル変数は、finalを付けて宣言できる','インタフェースは、protectedを付けて宣言できる','インスタンス変数は、staticを付けて宣言できる','抽象メソッドは、privateを付けて宣言できる','インナークラスは、publicを付けて宣言できる'],
   answers:[0,4],
   exp:'ローカル変数に final は可（A正）。メンバのインナークラスに public は可（E正）。トップレベル interface に protected は不可（B誤）、static を付けるとインスタンス変数ではなくクラス変数になる（C誤）、抽象メソッドは実装される前提で private 不可（D誤）。'},
 
@@ -1630,20 +1684,43 @@ module B {
 
  {id:'m23',cat:'オーバーロード / 型解決',src:'第12章 問23',multi:true,
   prompt:'次のプログラムの説明として正しいものを3つ選びなさい。',
-  code:`public class A {
-    public void sample(Collection arg) { System.out.println("A"); }
-}
-public class B extends A {
-    public void sample(Collection arg) { System.out.println("B"); }
-    public void sample(List arg)       { System.out.println("C"); }
+  code:`import java.util.Collection;
+
+public class A {
+    public void sample(Collection arg) {
+        System.out.println("A");
+    }
 }
 
-// 呼び出し側
-A a1 = new A();
-A a2 = new B();
-B b1 = new B();
-List list = new ArrayList();`,
-  options:['a1.sample(list) を実行すると A が表示される','a2.sample(list) を実行すると A が表示される','a2.sample(list) を実行すると B が表示される','b1.sample(list) を実行すると B が表示される','b1.sample(list) を実行すると C が表示される'],
+import java.util.Collection;
+import java.util.List;
+
+public class B extends A {
+    public void sample(Collection arg) {
+        System.out.println("B");
+    }
+    public void sample(List arg) {
+        System.out.println("C");
+    }
+}
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+
+        A a1 = new A();
+        A a2 = new B();
+        B b1 = new B();
+
+        List<String> list = new ArrayList<>();
+
+        // do something
+
+    }
+}`,
+  options:['「a1.sample(list)」を実行すると、Aが表示される','「a2.sample(list)」を実行すると、Aが表示される','「a2.sample(list)」を実行すると、Bが表示される','「b1.sample(list)」を実行すると、Bが表示される','「b1.sample(list)」を実行すると、Cが表示される'],
   answers:[0,2,4],
   exp:'a1(A型/A実体)→ A型の sample(Collection)→ "A"（A正）。a2(A型/B実体)→ コンパイル時は A型基準で sample(Collection) に解決、実行時に B のオーバーライドが動き "B"（B誤・C正）。b1(B型/B実体)→ 引数 list(List) に最も厳密な sample(List) が選ばれ "C"（D誤・E正）。'},
 
@@ -1652,10 +1729,15 @@ List list = new ArrayList();`,
   code:`public interface A {
     public A build(String str);
 }
+
 public class B implements A {
-    public B(String str) { }
+    public B(String str) {
+        // ...
+    }
     @Override
-    public B build(String str) { return new B(str); }
+    public B build(String str) {
+        return new B(str);
+    }
 }`,
   options:['Aはfinalにできない','Bはabstractにできない','Bはfinalにできない','AはBのサブタイプである','Aはabstractにできない','BはAのサブタイプである'],
   answers:[0,1,5],
@@ -1693,7 +1775,6 @@ public class B implements A {
   prompt:'コンパイル可能で、かつ array フィールドに参照をセットできるコンストラクタを2つ選びなさい。（class Sample に private String[] array;）',
   code:`public class Sample {
     private String[] array;
-    // ↓ このコンストラクタの候補を選ぶ
 }`,
   options:['public Sample(String[] array) {\n    this.array = array;\n}','public Sample(String... array) {\n    array = array;\n}','public Sample(String str) {\n    this.array = str;\n}','public Sample(String[] array) {\n    array = array;\n}','public Sample(String... array) {\n    this.array = array;\n}','public Sample(Object[] array) {\n    this.array = array;\n}'],
   answers:[0,4],
@@ -1701,11 +1782,16 @@ public class B implements A {
 
  {id:'m78',cat:'オーバーライド / アクセス修飾子',src:'第12章 問78',multi:true,
   prompt:'B クラスの空欄に入るコードとして正しいものを2つ選びなさい。（abstract A に protected abstract void test();、B extends A）',
-  code:`// ex78.a
+  code:`package ex78.a;
+
 public abstract class A {
     protected abstract void test();
 }
-// ex78.b（別パッケージ）
+
+package ex78.b;
+
+import ex78.a.A;
+
 public class B extends A {
     ［空欄］
 }`,
@@ -1725,19 +1811,19 @@ const EXTRA_QUESTIONS = [
  {id:'q1',cat:'配列 / null',src:'第12章 問74（問題集そのまま）',
   prompt:'次のプログラムをコンパイル・実行した結果は？',
   code:`public class Main {
-  public static void main(String[] args) {
-    String[] str = new String[2];
-    int i = 0;
-    for (String s : str) {
-      str[i].concat("e" + i);
-      i++;
+    public static void main(String[] args) {
+        String[] str = new String[2];
+        int i = 0;
+        for (String s : str) {
+            str[i].concat("e" + i);
+            i++;
+        }
+        for (i = 0; i < str.length; i++) {
+            System.out.println(str[i]);
+        }
     }
-    for (i = 0; i < str.length; i++) {
-      System.out.println(str[i]);
-    }
-  }
 }`,
-  options:['「e0」と「e1」が表示される','「null e0」と「null e1」が表示される','「null」と「null」が表示される','実行時に例外がスローされる'],
+  options:['e0\ne1','null e0\nnull e1','null\nnull','実行時に例外がスローされる'],
   answer:3,
   exp:'<b>①</b> <code>new String[2]</code> は箱を作るだけで中身は <b>null</b>（オブジェクト配列の初期値）。<b>②</b> 1回目のループで <code>str[0].concat()</code> ＝ <code>null.concat()</code> → <b>NullPointerException</b> で即停止し、出力ループには届かない。だから「表示される」系（e0/e1・null 等）は全て誤り。<b>③</b> 「null / null」は、String が不変で <code>concat</code> は新文字列を返すだけ＝要素は null のまま、までは正しいが <b>NPE を見落とした</b>人が選ぶ罠。'}
 ];
@@ -1798,7 +1884,7 @@ const BOOK_FIGS = {
   'b5':{lines:{2:['info','クラス変数 num=23（ローカル num に隠蔽される）'],4:['err','右辺 num は未初期化のローカル変数 → コンパイルエラー']},out:'結果：コンパイルエラー（未初期化ローカル変数を参照）'},
   'b7':{lines:{5:['ok','data=1 はどの case にも一致せず default → C（break無し）'],6:['ok','case 0 へフォールスルー → A → break']},out:'結果：「CA」と表示'},
   'b8':{lines:{7:['info','charAt(5) は数字5 → isDigit が true'],8:['ok','index=10 に設定'],13:['ok','substring(0,10) は添字10（末尾t）を含まない → hoge456tes']},out:'結果：「hoge456tes」と表示'},
-  'b10':{lines:{9:['info','B が x() を具象実装 → A の x() は C で実装不要'],10:['err','抽象メソッド z() が未実装'],15:['ok','position 3 に public void z(){} を書けば成立']},out:'結果：position 3 に z() を実装（B）'},
+  'b10':{lines:{7:['info','B が x() を具象実装 → A の x() は C で実装不要'],8:['err','抽象メソッド z() が未実装'],12:['ok','position 3 に public void z(){} を書けば成立']},out:'結果：position 3 に z() を実装（B）'},
   'b11':{lines:{2:['info','String... args は String 配列として扱われる'],3:['ok','拡張for で1要素ずつ → var value は String 型']},out:'結果：value の型は String（A）'},
   'b12':{lines:{5:['info','substring の戻り値を捨てている → str は不変のまま'],6:['ok','x = indexOf(ef) = 5']},out:'結果：「abcd ef gh 5」と表示'},
   'b13':{lines:{2:['info','str は未初期化で null'],4:['err','switch が null の hashCode() を呼ぶ → NullPointerException']},out:'結果：NullPointerException がスローされる'},
@@ -1808,7 +1894,7 @@ const BOOK_FIGS = {
   'b18':{lines:{4:['info','exports は公開パッケージ（依存関係ではない）'],7:['ok','requires com.logging → 依存先'],8:['ok','requires com.xml → 依存先']},out:'結果：requires 3つ（+java.base）を表す D'},
   'b19':{lines:{8:['info','bye() は B 独自メソッド（A には無い）'],15:['info','変数 a の型は A（実体は B）'],16:['err','A 型からは bye() を呼べない → コンパイルエラー']},out:'結果：コンパイルエラー（A型でbye()不可）'},
   'b20':{lines:{4:['info','test は (char, int) の2引数メソッド'],9:['err','引数1個で呼び出し → 一致するメソッド無し → コンパイルエラー']},out:'結果：コンパイルエラー（引数の数が不一致）'},
-  'b22':{lines:{2:['info','num はパッケージプライベート、同一パッケージなので継承先から参照可'],18:['ok','super.num で A のフィールドにアクセス（10を出力）'],19:['info','super.getValue() でスーパークラスのメソッドを呼ぶ']},out:'結果：CからAのフィールドにアクセスできる（説明Aが正しい）'},
+  'b22':{lines:{2:['info','num はパッケージプライベート、同一パッケージなので継承先から参照可'],19:['ok','super.num で A のフィールドにアクセス（10を出力）'],20:['info','super.getValue() でスーパークラスのメソッドを呼ぶ']},out:'結果：CからAのフィールドにアクセスできる（説明Aが正しい）'},
   'b24':{lines:{6:['info','B が default の sample() を定義'],13:['info','C も default の sample() を定義（菱形継承）'],21:['err','super.sample() は B/C どちらか特定できずコンパイルエラー']},out:'結果：菱形継承で super.sample() が曖昧 → コンパイルエラー'},
   'b25':{lines:{2:['info','A の抽象メソッドは引数なしの sample()'],6:['err','@Override だが対象メソッドが無い（シグニチャ不一致）'],7:['err','sample(int) はオーバーロードで抽象メソッド未実装']},out:'結果：抽象メソッド未実装＆@Override不正 → コンパイルエラー'},
   'b26':{lines:{3:['info','C は A を継承し B を実装（C は A/B の下位型）'],4:['info','D は C の下位型（D→C→A、D も B）']},out:'結果：List<D> に上位型 C は追加不可 → 選択肢Dがコンパイルエラー'},
@@ -1822,18 +1908,18 @@ const BOOK_FIGS = {
   'b38':{lines:{5:['info','List.of() は変更不可のリストを返す'],6:['err','add で UnsupportedOperationException']},out:'結果：UnsupportedOperationException がスロー'},
   'b39':{lines:{3:['info','"A B" は1引数、args は3要素 {"A B","A","B"}'],4:['ok','改行なしで連結出力']},out:'結果：「A BAB」と表示'},
   'b40':{lines:{5:['ok','i=0 で "A " を出力'],6:['info','array[0]は"C"でないので continue せず'],10:['ok','"end"出力後 break でループ脱出']},out:'結果：「A end」と表示'},
-  'b41':{lines:{6:['info','B: A.a()をCollectionへ共変オーバーライド（正）'],10:['info','C: A.a()をPathへ共変オーバーライド（正）'],13:['err','B,C多重継承でa()の戻り値がCollectionとPathで確定不可']},out:'結果：Dインターフェースでコンパイルエラー'},
-  'b42':{lines:{4:['info','Aのフィールド x="A"'],12:['info','Bで同名フィールド x="B"（隠蔽）'],22:['info','宣言型A・実体B'],23:['ok','フィールドは宣言型Aで解決 → "A"']},out:'結果：Aが表示される'},
+  'b41':{lines:{8:['info','B: A.a()をCollectionへ共変オーバーライド（正）'],14:['info','C: A.a()をPathへ共変オーバーライド（正）'],17:['err','B,C多重継承でa()の戻り値がCollectionとPathで確定不可']},out:'結果：Dインターフェースでコンパイルエラー'},
+  'b42':{lines:{4:['info','Aのフィールド x="A"'],13:['info','Bで同名フィールド x="B"（隠蔽）'],26:['info','宣言型A・実体B'],27:['ok','フィールドは宣言型Aで解決 → "A"']},out:'結果：Aが表示される'},
   'b43':{lines:{3:['info','isValueはAでprivate（同一クラス内限定）'],11:['err','サブクラスBからprivate isValueは参照不可 → コンパイルエラー']},out:'結果：コンパイルエラー'},
   'b44':{lines:{12:['err','暗黙super()を呼ぶがSampleに引数なしコンストラクタ無し'],16:['info','super(name,num)でスーパー呼び出し'],17:['err','super()の後にthis() → コンストラクタ呼出は先頭1つのみ']},out:'結果：SubSampleクラスの3行目と8行目の両方でコンパイルエラー'},
   'b45':{lines:{2:['info','抽象メソッドtest()。@Overrideはこの実装にのみ付与可']},out:'結果：implements無しで@Override付けのB（SampleTest2）が不正'},
-  'b46':{lines:{4:['info','now = 現在日付（2019-08-14）'],8:['ok','LocalDateのprintlnは既定でISO書式 yyyy-MM-dd']},out:'結果：2019-08-14 と表示される'},
+  'b46':{lines:{4:['info','now = 現在日付（2019-08-14）'],13:['ok','LocalDateのprintlnは既定でISO書式 yyyy-MM-dd']},out:'結果：2019-08-14 と表示される'},
   'b48':{lines:{3:['info','i=1 で開始'],4:['info','argsは a,b,c の3要素（クラス名Mainは入らない）'],5:['ok','後置i++は加算前の値 → 1) a  2) b  3) c']},out:'結果：1) a / 2) b / 3) c と表示される'},
-  'b49':{lines:{6:['info','setD(10)はd=10して10を返す'],8:['ok','右結合でsetD→c→b→aへ10を連鎖代入 → 全フィールド10']},out:'結果：Sample [a=10, b=10, c=10, d=10]'},
+  'b49':{lines:{15:['info','setD(10)はd=10して10を返す'],20:['ok','右結合でsetD→c→b→aへ10を連鎖代入 → 全フィールド10']},out:'結果：Sample [a=10, b=10, c=10, d=10]'},
   'b50':{lines:{5:['info','num++ で num=1'],7:['ok','num==1でcontinue → println(9行目)を飛ばす'],10:['info','1<1 は偽 → ループ終了、出力なし']},out:'結果：何も表示されない'},
   'b52':{lines:{7:['ok','mismatch:最初に違う添字2（3≠4）'],8:['ok','compare:辞書順でarray1が小(3<4) → -1']},out:'結果：2:-1 と表示される'},
-  'b53':{lines:{2:['ok','A:(float)x/y*100=250→round→250→/(float)100=2.5']},out:'結果：2.5 と表示される（選択肢A）'},
-  'b54':{lines:{7:['info','SampleImplがtest()を正しくオーバーライド'],11:['ok','test(int x)は引数違い → オーバーロード（別メソッド、正常）']},out:'結果：正常にコンパイル・実行できる'},
+  'b53':{lines:{4:['ok','A:(float)x/y*100=250→round→250→/(float)100=2.5']},out:'結果：2.5 と表示される（選択肢A）'},
+  'b54':{lines:{7:['info','SampleImplがtest()を正しくオーバーライド'],13:['ok','test(int x)は引数違い → オーバーロード（別メソッド、正常）']},out:'結果：正常にコンパイル・実行できる'},
   'b56':{lines:{4:['info','array[0]は2要素 {A,B}'],5:['info','array[1]は1要素 {C}'],6:['info','array[2]は4要素 {D,E,F,G}'],10:['ok','内側はarray[i].lengthで回る → 出力2個,1個,4個']},out:'結果：選択肢Bの並び（各行2,1,4要素）'},
   'b57':{lines:{5:['info','catch(Exception)が全サブクラスを捕捉'],7:['err','catch(RuntimeException)は到達不能 → コンパイルエラー']},out:'結果：コンパイルエラー'},
   'b58':{lines:{4:['ok','後置num++:9<10で真、その後num=10'],5:['ok','この時点でnumは10']},out:'結果：10 と表示される'},
@@ -1844,19 +1930,19 @@ const BOOK_FIGS = {
   'b63':{lines:{3:['info','x は宣言のみ・未初期化'],5:['info','条件は定数式でなく真偽未確定'],11:['err','x が未初期化の可能性→コンパイルエラー']},out:'結果：コンパイルエラー（x 未初期化の可能性）'},
   'b64':{lines:{2:['mute','int[] 版はエントリーポイントでない'],5:['mute','Object[] 版も呼ばれない'],8:['ok','String[] 版のみ JVM が起動'],9:['ok','C を出力']},out:'結果：C'},
   'b65':{lines:{7:['ok','A(int) が最初に 2 を出力'],4:['info','A() に戻り 1'],17:['info','B(int) に戻り 4'],14:['ok','最後に B() が 3']},out:'結果：2143'},
-  'b66':{lines:{2:['info','print は static メソッド'],7:['ok','空欄は Sample::print（クラス名::メソッド名）']},out:'結果：Sample::print が正解'},
+  'b66':{lines:{2:['info','print は static メソッド'],12:['ok','空欄は Sample::print（クラス名::メソッド名）']},out:'結果：Sample::print が正解'},
   'b69':{lines:{9:['err','無限に add しメモリ枯渇→OutOfMemoryError'],11:['mute','RuntimeException では捕捉不可'],13:['mute','Exception でも捕捉不可'],16:['mute','C に到達しない']},out:'結果：OutOfMemoryError がスロー（未捕捉）'},
   'b71':{lines:{3:['info','2×2 配列に a,b,c,d を格納'],8:['ok','正解Dは更新文を本体に置く二重forで abcd']},out:'結果：D（i++/j++を本体に置く二重for）で abcd'},
-  'b72':{lines:{1:['info','ABCD で初期化'],2:['ok','正解Bは replace(1,2,X) で B のみ置換']},out:'結果：B（replace(indexOf(B),indexOf(C),X)）で AXCD'},
-  'b73':{lines:{2:['ok','正解Bは i=0; i<5; i+=2 で index 0,2,4'],3:['info','array[0],[2],[4]＝1,3,5 を出力']},out:'結果：B（i=0;i<5;i+=2）で 135'},
+  'b72':{lines:{3:['info','ABCD で初期化'],4:['ok','正解Bは replace(1,2,X) で B のみ置換']},out:'結果：B（replace(indexOf(B),indexOf(C),X)）で AXCD'},
+  'b73':{lines:{4:['ok','正解Bは i=0; i<5; i+=2 で index 0,2,4'],5:['info','array[0],[2],[4]＝1,3,5 を出力']},out:'結果：B（i=0;i<5;i+=2）で 135'},
   'b76':{lines:{6:['info','args（String[]）を渡す'],3:['ok','最も具体的な test(String[]) が選ばれ B'],2:['mute','test(Object[]) は選ばれない']},out:'結果：B'},
   'b77':{lines:{13:['info','sample は Sample 型（実体は SubSample）'],14:['err','上位型→下位型の代入にキャスト必要→コンパイルエラー'],15:['mute','ここには到達しない']},out:'結果：コンパイルエラー（14行目 sub=sample にキャスト必要）'},
   'b80':{lines:{5:['info','array[1] は長さ5'],8:['err','条件が array.length(=2) の罠、b は 0,1 のみ'],9:['ok','各行2個だけ代入（i=97〜100）']},out:'結果：97 98 ／ 99 100 null null null'},
-  'm6':{lines:{3:['info','A が B を requires（exports 無し＝非公開）'],7:['err','B が A を requires→A↔B 循環依存でコンパイルエラー']},out:'結果：コンパイルエラー（循環依存）＋両モジュール非公開'},
-  'm23':{lines:{2:['info','A の sample(Collection)→A'],5:['ok','B が sample(Collection) をオーバーライド→a2 は B'],6:['ok','B は sample(List) も持ち b1 は最厳密で C']},out:'結果：a1→A, a2→B, b1→C（正解 A,C,E）'},
-  'm28':{lines:{1:['info','interface は暗黙 abstract・final 不可'],4:['info','B implements A→B は A のサブタイプ'],7:['ok','build 内で new B→B を abstract にできない']},out:'結果：正しいのは A,B,F'},
-  'm68':{lines:{2:['info','フィールドは String[] array'],3:['ok','正解は A(this.array=array) と E(String... を this 代入)']},out:'結果：A と E'},
-  'm78':{lines:{3:['info','元は protected abstract'],7:['ok','空欄は public か protected のみ（狭めるのは不可）']},out:'結果：A(public) と D(protected)'},
+  'm6':{lines:{2:['info','A が B を requires（exports 無し＝非公開）'],6:['err','B が A を requires→A↔B 循環依存でコンパイルエラー']},out:'結果：コンパイルエラー（循環依存）＋両モジュール非公開'},
+  'm23':{lines:{4:['info','A の sample(Collection)→A'],13:['ok','B が sample(Collection) をオーバーライド→a2 は B'],16:['ok','B は sample(List) も持ち b1 は最厳密で C']},out:'結果：a1→A, a2→B, b1→C（正解 A,C,E）'},
+  'm28':{lines:{1:['info','interface は暗黙 abstract・final 不可'],5:['info','B implements A→B は A のサブタイプ'],11:['ok','build 内で new B→B を abstract にできない']},out:'結果：正しいのは A,B,F'},
+  'm68':{lines:{2:['info','フィールドは String[] array']},out:'結果：A と E'},
+  'm78':{lines:{4:['info','元は protected abstract'],12:['ok','空欄は public か protected のみ（狭めるのは不可）']},out:'結果：A(public) と D(protected)'},
 };
 Object.assign(FIGS, BOOK_FIGS);
 /* BOOKFIGS_END */
